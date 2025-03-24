@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <math.h>
 
+enum { IQSZ_ = 64 };
+
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -18,8 +20,6 @@ struct _glfw_inputevent {
 	double time;
 };
 
-enum { IQSZ_ = 64 };
-
 struct _glfw_winstate {
 	GLFWwindow* win;
 	int width, height;
@@ -29,27 +29,22 @@ struct _glfw_winstate {
 	double mx, my;
 
 	/* Queue of keypresses to evaluate at once */
-	struct _glfw_inputevent inputqueue[IQSZ_];
+	struct _glfw_inputevent iq[IQSZ_];
 	int iqstart, iqend;
 	
 	double time;
 };
 
-struct _glfw_winstate ws;
+struct _glfw_winstate ws = {
+	.win = NULL,
+	.width = 640, .height = 480,
+	.title = "C is best",
 
-/* Extensive use of global variables */
-/* Singular global window, width, height, title */
-GLFWwindow* win;
-int win_width=640, win_height=480;
-const char* win_title = "Pitch dark sky";
-/* Mouse x, y position */
-double mx = 0, my = 0;
+	.mx = 0, .my = 0,
 
-/* Queue of keypresses to evaluate at once */
-struct _glfw_inputevent inputqueue[IQSZ_];
-int iqstart = 0, iqend = 0;
-
-double time;
+	.iqstart = 0, .iqend = 0,
+	.time = 0
+};
 
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
@@ -61,16 +56,16 @@ void _glfw_callback_error(int err, const char* desc) {
 	exit(EXIT_FAILURE);
 }
 
-void inputqueuecheck(void) {
+void inputqueuecheck() {
 	/* Bounds check for queue just in case */
-	if(iqstart < 0 || iqstart >= IQSZ_ || iqend < 0 || iqend >= 2*IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", iqstart, iqend, IQSZ_);
+	if(ws.iqstart < 0 || ws.iqstart >= IQSZ_ || ws.iqend < 0 || ws.iqend >= 2*IQSZ_) {
+		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iqstart, ws.iqend, IQSZ_);
 		exit(EXIT_FAILURE);
 	}
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(iqend == iqstart + IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", iqstart, IQSZ_);
+	if(ws.iqend == ws.iqstart + IQSZ_) {
+		fprintf(stderr, "ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iqstart, IQSZ_);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -78,17 +73,17 @@ void inputqueuecheck(void) {
 void inputqueueappend(int key, int action, int mods) {
 	inputqueuecheck();
 
-	inputqueue[iqend].key = key;
-	inputqueue[iqend].action = action;
-	inputqueue[iqend].mods = mods;
+	ws.iq[ws.iqend].key = key;
+	ws.iq[ws.iqend].action = action;
+	ws.iq[ws.iqend].mods = mods;
 
 	/* Mouse x,y coordinates and time are not rechecked in key callback function */
-	inputqueue[iqend].mx = mx;
-	inputqueue[iqend].mx = my;
-	inputqueue[iqend].time = time;
+	ws.iq[ws.iqend].mx = ws.mx;
+	ws.iq[ws.iqend].mx = ws.my;
+	ws.iq[ws.iqend].time = ws.time;
 
-	iqend += 1;
-	iqend %= 2*IQSZ_;
+	ws.iqend += 1;
+	ws.iqend %= 2*IQSZ_;
 }
 
 
@@ -106,8 +101,8 @@ void _glfw_callback_key(GLFWwindow* window, int key, int scancode, int action, i
 void _glfw_callback_cursorpos(GLFWwindow* window, double x, double y) {
 	/* Window remains unused */
 	(void)window;
-	mx = x;
-	my = y;
+	ws.mx = x;
+	ws.my = y;
 }
 
 void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int mods) {
@@ -132,15 +127,15 @@ void _glfw_create_window(int fullscreen, int windowed) {
 		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-		win_width = mode->width;
-		win_height = mode->height;
+		ws.width = mode->width;
+		ws.height = mode->height;
 	}
 	if(fullscreen && windowed)
 		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 	if(windowed)
 		mon = NULL;
 
-	ws.win = glfwCreateWindow(win_width, win_height, win_title, mon, NULL);
+	ws.win = glfwCreateWindow(ws.width, ws.height, ws.title, mon, NULL);
 	if(!ws.win) exit(EXIT_FAILURE);
 }
 
@@ -171,12 +166,12 @@ void _glfw_initialize(void) {
 }
 
 void evalqueue(void) {
-	for(int i = iqstart; i != iqend; ++i) {
+	for(int i = ws.iqstart; i != ws.iqend; ++i) {
 		continue;
 	}
-	memset(inputqueue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	iqstart = 0;
-	iqend = 0;
+	memset(ws.iq, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
+	ws.iqstart = 0;
+	ws.iqend = 0;
 }
 
 /* Main function */
@@ -192,14 +187,14 @@ int main(void) {
 		/* Render */
 
 		/* GLFW window handling */
-		glfwGetFramebufferSize(ws.win, &win_width, &win_height);
+		glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
 		/* Update time and other computations */
-		time = glfwGetTime();
-		deltaTime = time - t0;
-		t0 = time;
+		ws.time = glfwGetTime();
+		deltaTime = ws.time - t0;
+		t0 = ws.time;
 		frameCounter += 1;
 
 		evalqueue();
