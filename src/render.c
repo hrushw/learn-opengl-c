@@ -8,18 +8,6 @@
 #include <assert.h>
 #include <math.h>
 
-/* Extensive use of global variables */
-/* Singular global window, width, height, title */
-GLFWwindow* win;
-int win_width=640, win_height=480;
-const char* win_title = "Pitch dark sky";
-void __glfw_window_destroy(void) {
-	glfwDestroyWindow(win);
-}
-
-/* Mouse x, y position */
-double mx = 0, my = 0;
-
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -30,12 +18,40 @@ struct _glfw_inputevent {
 	double time;
 };
 
-/* Queue of keypresses to evaluate at once */
 enum { IQSZ_ = 64 };
+
+struct _glfw_winstate {
+	GLFWwindow* win;
+	int width, height;
+	const char* title;
+
+	/* Mouse x, y position */
+	double mx, my;
+
+	/* Queue of keypresses to evaluate at once */
+	struct _glfw_inputevent inputqueue[IQSZ_];
+	int iqstart, iqend;
+	
+	double time;
+};
+
+/* Extensive use of global variables */
+/* Singular global window, width, height, title */
+GLFWwindow* win;
+int win_width=640, win_height=480;
+const char* win_title = "Pitch dark sky";
+/* Mouse x, y position */
+double mx = 0, my = 0;
+
+/* Queue of keypresses to evaluate at once */
 struct _glfw_inputevent inputqueue[IQSZ_];
 int iqstart = 0, iqend = 0;
 
 double time;
+
+void __glfw_window_destroy(void) {
+	glfwDestroyWindow(win);
+}
 
 /* Immediately exit on any error encountered by GLFW */
 void _glfw_callback_error(int err, const char* desc) {
@@ -149,7 +165,6 @@ void _glfw_initialize(void) {
 	glfwSetMouseButtonCallback(win, _glfw_callback_mouseclick);
 
 	glfwMakeContextCurrent(win);
-	gladLoadGL(glfwGetProcAddress);
 	glfwSwapInterval(1);
 }
 
@@ -165,6 +180,7 @@ void evalqueue(void) {
 /* Main function */
 int main(void) {
 	_glfw_initialize();
+	gladLoadGL(glfwGetProcAddress);
 
 	int frameCounter = 0;
 	int run = 1;
