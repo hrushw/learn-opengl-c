@@ -35,6 +35,8 @@ struct _glfw_winstate {
 	double time;
 };
 
+struct _glfw_winstate ws;
+
 /* Extensive use of global variables */
 /* Singular global window, width, height, title */
 GLFWwindow* win;
@@ -50,7 +52,7 @@ int iqstart = 0, iqend = 0;
 double time;
 
 void __glfw_window_destroy(void) {
-	glfwDestroyWindow(win);
+	glfwDestroyWindow(ws.win);
 }
 
 /* Immediately exit on any error encountered by GLFW */
@@ -138,8 +140,8 @@ void _glfw_create_window(int fullscreen, int windowed) {
 	if(windowed)
 		mon = NULL;
 
-	win = glfwCreateWindow(win_width, win_height, win_title, mon, NULL);
-	if(!win) exit(EXIT_FAILURE);
+	ws.win = glfwCreateWindow(win_width, win_height, win_title, mon, NULL);
+	if(!ws.win) exit(EXIT_FAILURE);
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
@@ -160,11 +162,11 @@ void _glfw_initialize(void) {
 	_glfw_create_window(0, 1);
 	atexit(__glfw_window_destroy);
 
-	glfwSetKeyCallback(win, _glfw_callback_key);
-	glfwSetCursorPosCallback(win, _glfw_callback_cursorpos);
-	glfwSetMouseButtonCallback(win, _glfw_callback_mouseclick);
+	glfwSetKeyCallback(ws.win, _glfw_callback_key);
+	glfwSetCursorPosCallback(ws.win, _glfw_callback_cursorpos);
+	glfwSetMouseButtonCallback(ws.win, _glfw_callback_mouseclick);
 
-	glfwMakeContextCurrent(win);
+	glfwMakeContextCurrent(ws.win);
 	glfwSwapInterval(1);
 }
 
@@ -186,12 +188,12 @@ int main(void) {
 	int run = 1;
 	double t0 = glfwGetTime();
 	double deltaTime = 0;
-	while(!glfwWindowShouldClose(win) && run) {
+	while(!glfwWindowShouldClose(ws.win) && run) {
 		/* Render */
 
 		/* GLFW window handling */
-		glfwGetFramebufferSize(win, &win_width, &win_height);
-		glfwSwapBuffers(win);
+		glfwGetFramebufferSize(ws.win, &win_width, &win_height);
+		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
 		/* Update time and other computations */
