@@ -33,6 +33,7 @@ struct _glfw_winstate {
 	int iqstart, iqend;
 	
 	double time;
+	double dt;
 };
 
 struct _glfw_winstate ws = {
@@ -43,7 +44,7 @@ struct _glfw_winstate ws = {
 	.mx = 0, .my = 0,
 
 	.iqstart = 0, .iqend = 0,
-	.time = 0
+	.time = 0, .dt = 0
 };
 
 void __glfw_window_destroy(void) {
@@ -182,7 +183,6 @@ int main(void) {
 	int frameCounter = 0;
 	int run = 1;
 	double t0 = glfwGetTime();
-	double deltaTime = 0;
 	while(!glfwWindowShouldClose(ws.win) && run) {
 		/* Render */
 
@@ -193,13 +193,11 @@ int main(void) {
 
 		/* Update time and other computations */
 		ws.time = glfwGetTime();
-		deltaTime = ws.time - t0;
+		ws.dt = ws.time - t0;
 		t0 = ws.time;
 		frameCounter += 1;
 
 		evalqueue();
-
-		(void)deltaTime;
 	}
 
 	exit(EXIT_SUCCESS);
