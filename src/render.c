@@ -106,6 +106,8 @@ void _glfw_callback_cursorpos(GLFWwindow* window, double x, double y) {
 	ws.my = y;
 }
 
+/* Mouse click callback: same as key callback */
+/* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int mods) {
 	inputqueueappend(button, action, mods);
 
@@ -114,7 +116,7 @@ void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int m
 }
 
 /* Create window - optionally maximize and make it fullscreen */
-/*( unknown what occurs at windowed = 0, fullscreen = 1 ) */
+/*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
 void _glfw_create_window(int fullscreen, int windowed) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
