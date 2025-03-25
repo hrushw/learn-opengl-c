@@ -6,9 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 #include <math.h>
 
-enum { IQSZ_ = 64 };
+enum { IQSZ_ = 64, MAXFSZ_ = 1 << 26 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -43,6 +44,7 @@ struct _glfw_winstate ws = {
 
 	.mx = 0, .my = 0,
 
+	.iq = {{0, 0, 0, 0, 0, 0}},
 	.iqstart = 0, .iqend = 0,
 	.time = 0, .dt = 0
 };
@@ -51,28 +53,29 @@ void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
 }
 
-/* Immediately exit on any error encountered by GLFW */
-void _glfw_callback_error(int err, const char* desc) {
-	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+void _die(const char* fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	vfprintf(stderr, fmt, va);
+	va_end(va);
 	exit(EXIT_FAILURE);
 }
 
-void inputqueuecheck() {
+/* Immediately exit on any error encountered by GLFW */
+void _glfw_callback_error(int err, const char* desc) {
+	_die("GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+}
+
+void _iqcheck() {
 	/* Bounds check for queue just in case */
-	if(ws.iqstart < 0 || ws.iqstart >= IQSZ_ || ws.iqend < 0 || ws.iqend >= 2*IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iqstart, ws.iqend, IQSZ_);
-		exit(EXIT_FAILURE);
-	}
+	if(ws.iqstart < 0 || ws.iqstart >= IQSZ_ || ws.iqend < 0 || ws.iqend >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iqstart, ws.iqend, IQSZ_);
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(ws.iqend == ws.iqstart + IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iqstart, IQSZ_);
-		exit(EXIT_FAILURE);
-	}
+	if(ws.iqend == ws.iqstart + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iqstart, IQSZ_);
 }
 
 void inputqueueappend(int key, int action, int mods) {
-	inputqueuecheck();
+	_iqcheck();
 
 	ws.iq[ws.iqend].key = key;
 	ws.iq[ws.iqend].action = action;
@@ -168,6 +171,7 @@ void _glfw_initialize(void) {
 	glfwSwapInterval(1);
 }
 
+/* Currently only clears the queue and resets indices */
 void evalqueue(void) {
 	for(int i = ws.iqstart; i != ws.iqend; ++i) {
 		continue;
@@ -177,10 +181,98 @@ void evalqueue(void) {
 	ws.iqend = 0;
 }
 
+/* Function to read file contents into dynamically allocated buffer with too many checks */
+char* filetobuf(const char* path, int* len) {
+	FILE* f = fopen(path, "rb");
+	if(!f) _die("ERROR: Failed to open file '%s'!\n", path);
+	if(fseek(f, 0L, SEEK_END) == -1) _die("ERROR: Failed to seek to end of file '%s'!\n", path);
+	long l = ftell(f);
+	if(l < 0) _die("ERROR: Failed to get size of file '%s'\n", path);
+	if(l > MAXFSZ_ - 1) _die("ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, MAXFSZ_ - 1);
+
+	rewind(f);
+
+	char* buf = malloc((l + 1)*sizeof(char));
+	if(!buf) _die("ERROR: Unable to allocate memory of size '%d' bytes!\n", l+1);
+	if(fread(buf, sizeof(char), l, f) != (size_t)l) _die("ERROR: Error occured while reading file '%s'!\n", path);
+	buf[l] = 0;
+
+	if(fclose(f)) _die("ERROR: Unable to close file '%s'\n", path);
+
+	if(len) *len = l;
+	return buf;
+}
+
+unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len) {
+	char* src = filetobuf(path, NULL);
+	unsigned int s = glCreateShader(type);
+	int success = 0;
+
+	glShaderSource(s, 1, (const char**)&src, NULL);;
+	free(src);
+
+	glCompileShader(s);
+	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
+	if(!success) {
+		int gl_il_len;
+		const char* typename;
+		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
+		if(gl_il_len > il_len) _die("ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
+		glGetShaderInfoLog(s, il_len, NULL, infolog);
+		switch(type) {
+			case GL_VERTEX_SHADER:
+				typename = "GL_VERTEX_SHADER";
+				break;
+			case GL_FRAGMENT_SHADER:
+				typename = "GL_FRAGMENT_SHADER";
+				break;
+			default:
+				typename = "<unknown>";
+		}
+		infolog[il_len-1] = 0;
+		_die("ERROR: Failed to compile shader of type '%s'! Error log:\n%s\n", typename, infolog);
+	}
+
+
+	return s;
+}
+
+/* Generate the shader program */
+unsigned int genProgram(const char* vertpath, const char* fragpath) {
+	enum { il_len = 1023 };
+	int success = 0;
+	char infolog[il_len + 1] = {0};
+
+	unsigned int vert = genShader(vertpath, GL_VERTEX_SHADER, infolog, il_len);
+	unsigned int frag = genShader(fragpath, GL_FRAGMENT_SHADER, infolog, il_len);
+
+	unsigned int sp = glCreateProgram();
+	glAttachShader(sp, vert);
+	glAttachShader(sp, frag);
+
+	glLinkProgram(sp);
+
+	glDeleteShader(vert);
+	glDeleteShader(frag);
+
+	glGetProgramiv(sp, GL_LINK_STATUS, &success);
+	if(!success) {
+		int gl_il_len;
+		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
+		if(gl_il_len > il_len) _die("ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
+		glGetProgramInfoLog(sp, il_len, NULL, infolog);
+		infolog[il_len-1] = 0;
+		_die("ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
+	}
+	return sp;
+}
+
 /* Main function */
 int main(void) {
 	_glfw_initialize();
 	gladLoadGL(glfwGetProcAddress);
+
+	unsigned int shaderProg = genProgram("vertex.glsl", "fragment.glsl");
 
 	int frameCounter = 0;
 	int run = 1;
@@ -202,5 +294,6 @@ int main(void) {
 		evalqueue();
 	}
 
+	glDeleteProgram(shaderProg);
 	exit(EXIT_SUCCESS);
 }
