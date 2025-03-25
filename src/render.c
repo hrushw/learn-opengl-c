@@ -273,6 +273,12 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	return sp;
 }
 
+void updatetime(double *t0) {
+	ws.time = glfwGetTime();
+	ws.dt = ws.time - *t0;
+	*t0 = ws.time;
+}
+
 /* Main function */
 int main(void) {
 	_glfw_initialize();
@@ -281,24 +287,23 @@ int main(void) {
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
 
+	glClearColor(0.1, 0.0, 0.1, 1.0);
+
 	int frameCounter = 0;
 	int run = 1;
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && run) {
 		/* Render */
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		/* GLFW window handling */
 		glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
-		/* Update time and other computations */
-		ws.time = glfwGetTime();
-		ws.dt = ws.time - t0;
-		t0 = ws.time;
-		frameCounter += 1;
-
+		updatetime(&t0);
 		evalqueue();
+		frameCounter += 1;
 	}
 
 	exit(EXIT_SUCCESS);
