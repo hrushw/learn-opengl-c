@@ -90,35 +90,37 @@ void _glfw_callback_error(int err, const char* desc) {
 	_die("GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
 }
 
-void _iqcheck() {
+void _iqcheck(struct _glfw_inputqueue *q) {
 	/* Bounds check for queue just in case */
-	if(ws.iq.start < 0 || ws.iq.start >= IQSZ_ || ws.iq.end < 0 || ws.iq.end >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iq.start, ws.iq.end, IQSZ_);
+	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(ws.iq.end == ws.iq.start + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iq.start, IQSZ_);
+	if(q->end == q->start + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
 }
 
-void inputqueueappend(int key, int action, int mods) {
-	_iqcheck();
+void _iqappend(struct _glfw_inputqueue* q, int key, int action, int mods, double mx, double my, double time) {
+	_iqcheck(q);
 
-	ws.iq.queue[ws.iq.end].key = key;
-	ws.iq.queue[ws.iq.end].action = action;
-	ws.iq.queue[ws.iq.end].mods = mods;
+	q->queue[q->end] = (struct _glfw_inputevent) {
+		.key = key,
+		.action = action,
+		.mods = mods,
 
-	/* Mouse x,y coordinates and time are not rechecked in key callback function */
-	ws.iq.queue[ws.iq.end].mx = ws.mx;
-	ws.iq.queue[ws.iq.end].mx = ws.my;
-	ws.iq.queue[ws.iq.end].time = ws.time;
+		/* Mouse x,y coordinates and time are not rechecked in key callback function */
+		.mx = mx,
+		.my = my,
+		.time = time
+	};
 
-	ws.iq.end += 1;
-	ws.iq.end %= 2*IQSZ_;
+	q->end += 1;
+	q->end %= 2*IQSZ_;
 }
 
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
 /* Additionally store mouse coordinates into queue */
 void _glfw_callback_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
-	inputqueueappend(key, action, mods);
+	_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
 
 	/* Window and scancode remain unused */
 	(void)window;
@@ -136,7 +138,7 @@ void _glfw_callback_cursorpos(GLFWwindow* window, double x, double y) {
 /* Mouse click callback: same as key callback */
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int mods) {
-	inputqueueappend(button, action, mods);
+	_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
 
 	/* Window remains unused */
 	(void)window;
@@ -196,13 +198,13 @@ void _glfw_initialize(void) {
 }
 
 /* Currently only clears the queue and resets indices */
-void evalqueue(void) {
-	for(int i = ws.iq.start; i != ws.iq.end; ++i) {
+void evalqueue(struct _glfw_inputqueue *q) {
+	for(int i = q->start; i != q->end; ++i) {
 		continue;
 	}
-	memset(ws.iq.queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	ws.iq.start = 0;
-	ws.iq.end = 0;
+	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
+	q->start = 0;
+	q->end = 0;
 }
 
 /* Function to read file contents into dynamically allocated buffer with too many checks */
@@ -320,7 +322,7 @@ int main(void) {
 		glfwPollEvents();
 
 		updatetime(&ws.time, &ws.dt, &t0);
-		evalqueue();
+		evalqueue(&ws.iq);
 		frameCounter += 1;
 	}
 
