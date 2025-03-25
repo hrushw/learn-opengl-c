@@ -186,7 +186,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
 
-	_glfw_create_window(0, 1);
+	_glfw_create_window(wst, 0, 1);
 	atexit(__glfw_window_destroy);
 
 	glfwSetKeyCallback(wst->win, _glfw_callback_key);
@@ -301,7 +301,7 @@ void updatetime(double *time, double *t0, double *dt) {
 
 /* Main function */
 int main(void) {
-	_glfw_initialize();
+	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
