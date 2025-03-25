@@ -11,18 +11,6 @@
 
 enum { IQSZ_ = 64, MAXFSZ_ = 1 << 26 };
 
-float vertices[] = {
-	-1.0, -1.0,
-	-1.0, 3.0,
-	3.0, -1.0
-};
-
-float colors[] = {
-	0.6f, 0.1f, 0.0f,
-	0.2f, 0.45f, 0.3f,
-	0.0f, 0.15f, 0.5f
-};
-
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
