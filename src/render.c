@@ -26,6 +26,8 @@ struct _glfw_winstate {
 	int width, height;
 	const char* title;
 
+	unsigned int sp;
+
 	/* Mouse x, y position */
 	double mx, my;
 
@@ -51,6 +53,10 @@ struct _glfw_winstate ws = {
 
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
+}
+
+void __glfw_program_delete(void) {
+	glDeleteProgram(ws.sp);
 }
 
 void _die(const char* fmt, ...) {
@@ -272,7 +278,8 @@ int main(void) {
 	_glfw_initialize();
 	gladLoadGL(glfwGetProcAddress);
 
-	unsigned int shaderProg = genProgram("vertex.glsl", "fragment.glsl");
+	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+	atexit(__glfw_program_delete);
 
 	int frameCounter = 0;
 	int run = 1;
@@ -294,6 +301,5 @@ int main(void) {
 		evalqueue();
 	}
 
-	glDeleteProgram(shaderProg);
 	exit(EXIT_SUCCESS);
 }
