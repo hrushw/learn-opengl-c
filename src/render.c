@@ -98,7 +98,7 @@ void _iqcheck(struct _glfw_inputqueue *q) {
 	if(q->end == q->start + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
 }
 
-void _iqappend(struct _glfw_inputqueue* q, int key, int action, int mods, double mx, double my, double time) {
+void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
 	_iqcheck(q);
 
 	q->queue[q->end] = (struct _glfw_inputevent) {
@@ -119,7 +119,7 @@ void _iqappend(struct _glfw_inputqueue* q, int key, int action, int mods, double
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
 /* Additionally store mouse coordinates into queue */
-void _glfw_callback_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void _glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
 
 	/* Window and scancode remain unused */
@@ -128,7 +128,7 @@ void _glfw_callback_key(GLFWwindow* window, int key, int scancode, int action, i
 }
 
 /* Cursor position callback: simply update global mouse coordinates */
-void _glfw_callback_cursorpos(GLFWwindow* window, double x, double y) {
+void _glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 	/* Window remains unused */
 	(void)window;
 	ws.mx = x;
@@ -137,7 +137,7 @@ void _glfw_callback_cursorpos(GLFWwindow* window, double x, double y) {
 
 /* Mouse click callback: same as key callback */
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
-void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int mods) {
+void _glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
 
 	/* Window remains unused */
@@ -146,7 +146,7 @@ void _glfw_callback_mouseclick(GLFWwindow* window, int button, int action, int m
 
 /* Create window - optionally maximize and make it fullscreen */
 /*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
-void _glfw_create_window(int fullscreen, int windowed) {
+void _glfw_create_window(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
 
@@ -159,20 +159,20 @@ void _glfw_create_window(int fullscreen, int windowed) {
 		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-		ws.width = mode->width;
-		ws.height = mode->height;
+		wst->width = mode->width;
+		wst->height = mode->height;
 	}
 	if(fullscreen && windowed)
 		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 	if(windowed)
 		mon = NULL;
 
-	ws.win = glfwCreateWindow(ws.width, ws.height, ws.title, mon, NULL);
-	if(!ws.win) exit(EXIT_FAILURE);
+	wst->win = glfwCreateWindow(wst->width, wst->height, wst->title, mon, NULL);
+	if(!wst->win) exit(EXIT_FAILURE);
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-void _glfw_initialize(void) {
+void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwSetErrorCallback(_glfw_callback_error);
 	glfwInit();
 
@@ -189,11 +189,11 @@ void _glfw_initialize(void) {
 	_glfw_create_window(0, 1);
 	atexit(__glfw_window_destroy);
 
-	glfwSetKeyCallback(ws.win, _glfw_callback_key);
-	glfwSetCursorPosCallback(ws.win, _glfw_callback_cursorpos);
-	glfwSetMouseButtonCallback(ws.win, _glfw_callback_mouseclick);
+	glfwSetKeyCallback(wst->win, _glfw_callback_key);
+	glfwSetCursorPosCallback(wst->win, _glfw_callback_cursorpos);
+	glfwSetMouseButtonCallback(wst->win, _glfw_callback_mouseclick);
 
-	glfwMakeContextCurrent(ws.win);
+	glfwMakeContextCurrent(wst->win);
 	glfwSwapInterval(1);
 }
 
