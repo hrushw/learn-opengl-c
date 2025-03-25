@@ -11,6 +11,18 @@
 
 enum { IQSZ_ = 64, MAXFSZ_ = 1 << 26 };
 
+float vertices[] = {
+	-1.0, -1.0,
+	-1.0, 3.0,
+	3.0, -1.0
+};
+
+float colors[] = {
+	0.6f, 0.1f, 0.0f,
+	0.2f, 0.45f, 0.3f,
+	0.0f, 0.15f, 0.5f
+};
+
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -19,6 +31,11 @@ struct _glfw_inputevent {
 	double mx;
 	double my;
 	double time;
+};
+
+struct _glfw_inputqueue {
+	int start, end;
+	struct _glfw_inputevent queue[IQSZ_];
 };
 
 struct _glfw_winstate {
@@ -32,8 +49,7 @@ struct _glfw_winstate {
 	double mx, my;
 
 	/* Queue of keypresses to evaluate at once */
-	struct _glfw_inputevent iq[IQSZ_];
-	int iqstart, iqend;
+	struct _glfw_inputqueue iq;
 	
 	double time;
 	double dt;
@@ -46,8 +62,10 @@ struct _glfw_winstate ws = {
 
 	.mx = 0, .my = 0,
 
-	.iq = {{0, 0, 0, 0, 0, 0}},
-	.iqstart = 0, .iqend = 0,
+	.iq = {
+		.start = 0, .end = 0,
+		.queue = {{0}}
+	},
 	.time = 0, .dt = 0
 };
 
@@ -74,26 +92,26 @@ void _glfw_callback_error(int err, const char* desc) {
 
 void _iqcheck() {
 	/* Bounds check for queue just in case */
-	if(ws.iqstart < 0 || ws.iqstart >= IQSZ_ || ws.iqend < 0 || ws.iqend >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iqstart, ws.iqend, IQSZ_);
+	if(ws.iq.start < 0 || ws.iq.start >= IQSZ_ || ws.iq.end < 0 || ws.iq.end >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", ws.iq.start, ws.iq.end, IQSZ_);
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(ws.iqend == ws.iqstart + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iqstart, IQSZ_);
+	if(ws.iq.end == ws.iq.start + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", ws.iq.start, IQSZ_);
 }
 
 void inputqueueappend(int key, int action, int mods) {
 	_iqcheck();
 
-	ws.iq[ws.iqend].key = key;
-	ws.iq[ws.iqend].action = action;
-	ws.iq[ws.iqend].mods = mods;
+	ws.iq.queue[ws.iq.end].key = key;
+	ws.iq.queue[ws.iq.end].action = action;
+	ws.iq.queue[ws.iq.end].mods = mods;
 
 	/* Mouse x,y coordinates and time are not rechecked in key callback function */
-	ws.iq[ws.iqend].mx = ws.mx;
-	ws.iq[ws.iqend].mx = ws.my;
-	ws.iq[ws.iqend].time = ws.time;
+	ws.iq.queue[ws.iq.end].mx = ws.mx;
+	ws.iq.queue[ws.iq.end].mx = ws.my;
+	ws.iq.queue[ws.iq.end].time = ws.time;
 
-	ws.iqend += 1;
-	ws.iqend %= 2*IQSZ_;
+	ws.iq.end += 1;
+	ws.iq.end %= 2*IQSZ_;
 }
 
 
@@ -179,12 +197,12 @@ void _glfw_initialize(void) {
 
 /* Currently only clears the queue and resets indices */
 void evalqueue(void) {
-	for(int i = ws.iqstart; i != ws.iqend; ++i) {
+	for(int i = ws.iq.start; i != ws.iq.end; ++i) {
 		continue;
 	}
-	memset(ws.iq, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	ws.iqstart = 0;
-	ws.iqend = 0;
+	memset(ws.iq.queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
+	ws.iq.start = 0;
+	ws.iq.end = 0;
 }
 
 /* Function to read file contents into dynamically allocated buffer with too many checks */
@@ -273,10 +291,10 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	return sp;
 }
 
-void updatetime(double *t0) {
-	ws.time = glfwGetTime();
-	ws.dt = ws.time - *t0;
-	*t0 = ws.time;
+void updatetime(double *time, double *t0, double *dt) {
+	*time = glfwGetTime();
+	*dt = *time - *t0;
+	*t0 = *time;
 }
 
 /* Main function */
@@ -301,7 +319,7 @@ int main(void) {
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
-		updatetime(&t0);
+		updatetime(&ws.time, &ws.dt, &t0);
 		evalqueue();
 		frameCounter += 1;
 	}
