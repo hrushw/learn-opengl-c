@@ -7,9 +7,8 @@
 #include <string.h>
 #include <assert.h>
 #include <stdarg.h>
-#include <math.h>
 
-enum { IQSZ_ = 64, MAXFSZ_ = 1 << 26 };
+enum { IQSZ_ = 256, MAXFSZ_ = 1 << 26 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -233,6 +232,7 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 		if(gl_il_len > il_len) _die("ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
 		glGetShaderInfoLog(s, il_len, NULL, infolog);
+		/* get type of shader for which compilation fails */
 		switch(type) {
 			case GL_VERTEX_SHADER:
 				typename = "GL_VERTEX_SHADER";
@@ -253,7 +253,7 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 
 /* Generate the shader program */
 unsigned int genProgram(const char* vertpath, const char* fragpath) {
-	enum { il_len = 1023 };
+	enum { il_len = 4096 };
 	int success = 0;
 	char infolog[il_len + 1] = {0};
 
@@ -292,17 +292,27 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
+	/* TODO: make the program continue even after shader compilation failure */
+	/* (in order to allow hot reloading of shaders later) */
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
 
-	glClearColor(0.1, 0.0, 0.1, 1.0);
+	/* above code should not require modification */
+
+
+
+	/* end */
 
 	int frameCounter = 0;
 	int run = 1;
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && run) {
-		/* Render */
+		/* Begin rendering */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glUseProgram(ws.sp);
+
+		/* Finish rendering */
+
 
 		/* GLFW window handling */
 		glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
