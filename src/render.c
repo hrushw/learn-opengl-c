@@ -364,5 +364,8 @@ int main(void) {
 		frameCounter += 1;
 	}
 
+	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
+	glDeleteVertexArrays(1, &VAO);
 	exit(EXIT_SUCCESS);
 }
