@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <stdarg.h>
 
 enum { IQSZ_ = 256, MAXFSZ_ = 1 << 26 };
@@ -45,7 +44,7 @@ struct _glfw_winstate {
 struct _glfw_winstate ws = {
 	.win = NULL,
 	.width = 640, .height = 480,
-	.title = "C is best",
+	.title = "Waves",
 
 	.mx = 0, .my = 0,
 
@@ -103,7 +102,6 @@ void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double
 	q->end %= 2*IQSZ_;
 }
 
-
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
 /* Additionally store mouse coordinates into queue */
 void _glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -134,6 +132,7 @@ void _glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int m
 /* Create window - optionally maximize and make it fullscreen */
 /*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
 void _glfw_create_window(struct _glfw_winstate *wst, int fullscreen, int windowed) {
+	/* _die() is not used here, _glfw_callback_error should already handle error messages and exit */
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
 
@@ -225,6 +224,8 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 	free(src);
 
 	glCompileShader(s);
+
+	/* check shader compilation status */
 	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
 	if(!success) {
 		int gl_il_len;
@@ -257,6 +258,7 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	int success = 0;
 	char infolog[il_len + 1] = {0};
 
+	/* generate vertex and fragment shader */
 	unsigned int vert = genShader(vertpath, GL_VERTEX_SHADER, infolog, il_len);
 	unsigned int frag = genShader(fragpath, GL_FRAGMENT_SHADER, infolog, il_len);
 
@@ -269,6 +271,7 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	glDeleteShader(vert);
 	glDeleteShader(frag);
 
+	/* check program linking status */
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
 	if(!success) {
 		int gl_il_len;
@@ -297,19 +300,56 @@ int main(void) {
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
 
-	/* above code should not require modification */
 
+	int timeloc = glGetUniformLocation(ws.sp, "time");
+	if(timeloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'time'!\n");
 
+	float vertices[] = {
+		-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+		-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
+		-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+		-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
+		 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+		 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
+		 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+		 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
+		 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	};
 
-	/* end */
+	unsigned int VBO, VAO, EBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
+	glEnableVertexAttribArray(4);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)0);
+	glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(4*sizeof(float)));
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(7*sizeof(float)));
+	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(8*sizeof(float)));
+
+	glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
 
 	int frameCounter = 0;
 	int run = 1;
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && run) {
 		/* Begin rendering */
+		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glUniform1f(timeloc, (float)(ws.time - t0));
 		glUseProgram(ws.sp);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 9);
 
 		/* Finish rendering */
 
