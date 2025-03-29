@@ -316,7 +316,7 @@ int main(void) {
 		 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
 	};
 
-	unsigned int VBO, VAO, EBO;
+	unsigned int VBO, VAO;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
