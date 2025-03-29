@@ -342,7 +342,11 @@ int main(void) {
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && run) {
 		/* Begin rendering */
-		glViewport(0, 0, ws.width, ws.height);
+		// glViewport(0, 0, ws.width, ws.height);
+		int len = ws.width > ws.height ? ws.height : ws.width;
+		int pad = ( (ws.width > ws.height ? ws.width : ws.height) - len ) / 2;
+
+		ws.width < ws.height ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glUniform1f(timeloc, (float)(ws.time - t0));
 		glUseProgram(ws.sp);
