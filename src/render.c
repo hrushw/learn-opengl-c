@@ -183,16 +183,6 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwSwapInterval(1);
 }
 
-/* Currently only clears the queue and resets indices */
-void evalqueue(struct _glfw_inputqueue *q) {
-	for(int i = q->start; i != q->end; ++i) {
-		continue;
-	}
-	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	q->start = 0;
-	q->end = 0;
-}
-
 /* Function to read file contents into dynamically allocated buffer with too many checks */
 char* filetobuf(const char* path, int* len) {
 	FILE* f = fopen(path, "rb");
@@ -231,7 +221,7 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 		int gl_il_len;
 		const char* typename;
 		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len) _die("ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
+		if(gl_il_len > il_len) fprintf(stderr, "ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
 		glGetShaderInfoLog(s, il_len, NULL, infolog);
 		/* get type of shader for which compilation fails */
 		switch(type) {
@@ -245,7 +235,7 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 				typename = "<unknown>";
 		}
 		infolog[il_len-1] = 0;
-		_die("ERROR: Failed to compile shader of type '%s'! Error log:\n%s\n", typename, infolog);
+		fprintf(stderr, "ERROR: Failed to compile shader of type '%s'! Error log:\n%s\n", typename, infolog);
 	}
 
 
@@ -276,10 +266,10 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	if(!success) {
 		int gl_il_len;
 		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len) _die("ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
+		if(gl_il_len > il_len) fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
 		glGetProgramInfoLog(sp, il_len, NULL, infolog);
 		infolog[il_len-1] = 0;
-		_die("ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
+		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 	}
 	return sp;
 }
@@ -288,6 +278,17 @@ void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime();
 	*dt = *time - *t0;
 	*t0 = *time;
+}
+
+/* Currently only clears the queue and resets indices */
+void evalqueue(struct _glfw_inputqueue *q) {
+	for(int i = q->start; i != q->end; ++i) {
+		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
+			ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+	}
+	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
+	q->start = 0;
+	q->end = 0;
 }
 
 /* Main function */
