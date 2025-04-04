@@ -40,6 +40,8 @@ struct _glfw_winstate {
 	
 	double time;
 	double dt;
+
+	int runstate;
 };
 
 struct _glfw_winstate ws = {
@@ -53,7 +55,8 @@ struct _glfw_winstate ws = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
 	},
-	.time = 0, .dt = 0
+	.time = 0, .dt = 0,
+	.runstate = 1;
 };
 
 void _die(const char* fmt, ...);
@@ -302,24 +305,13 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
 			ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == GLFW_MOD_CONTROL | GLFW_MOD_SHIFT)
+			ws.runstate = 0;
 	}
 	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
 	q->start = 0;
 	q->end = 0;
 }
-
-/* Vertex data */
-float vertices[] = {
-	-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
-	-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
-	 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
-	 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
-	 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-};
 
 /* Main function */
 int main(void) {
@@ -331,46 +323,8 @@ int main(void) {
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
 
-	int timeloc = glGetUniformLocation(ws.sp, "time");
-	if(timeloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'time'!\n");
-
-	glGenBuffers(1, &ws.VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, ws.VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glGenVertexArrays(1, &ws.VAO);
-	glBindVertexArray(ws.VAO);
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
-	glEnableVertexAttribArray(3);
-	glEnableVertexAttribArray(4);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)0);
-	glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(3*sizeof(float)));
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(4*sizeof(float)));
-	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(7*sizeof(float)));
-	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(8*sizeof(float)));
-
-	glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-	int frameCounter = 0;
-	int run = 1;
 	double t0 = glfwGetTime();
-	while(!glfwWindowShouldClose(ws.win) && run) {
-		/* Begin rendering */
-		// glViewport(0, 0, ws.width, ws.height);
-		int len = ws.width > ws.height ? ws.height : ws.width;
-		int pad = ( (ws.width > ws.height ? ws.width : ws.height) - len ) / 2;
-
-		ws.width < ws.height ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-		glUniform1f(timeloc, (float)(ws.time - t0));
-		glUseProgram(ws.sp);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 9);
-
-		/* Finish rendering */
+	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
 
 
 		/* GLFW window handling */
@@ -379,7 +333,6 @@ int main(void) {
 
 		updatetime(&ws.time, &ws.dt, &t0);
 		evalqueue(&ws.iq);
-		frameCounter += 1;
 	}
 
 	glDeleteBuffers(1, &ws.VBO);
