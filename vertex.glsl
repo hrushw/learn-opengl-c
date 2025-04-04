@@ -11,7 +11,7 @@ out vec3 clr;
 uniform float time;
 
 void main() {
-	float k = 0.5f;
+	float k = 0.4f;
 	clr = color;
 	gl_Position = vec4(pos.x, pos.y + k*vibr*sin(w*(phase+time)), pos.z, 1.0f);
 }

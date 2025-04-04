@@ -9,6 +9,19 @@
 
 enum { IQSZ_ = 256, MAXFSZ_ = 1 << 26 };
 
+/* Vertex data */
+float vertices[] = {
+	-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
+	-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
+	 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
+	 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
+	 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+};
+
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -30,6 +43,7 @@ struct _glfw_winstate {
 	const char* title;
 
 	unsigned int sp;
+	unsigned int VBO, VAO;
 
 	/* Mouse x, y position */
 	double mx, my;
@@ -305,25 +319,12 @@ int main(void) {
 	int timeloc = glGetUniformLocation(ws.sp, "time");
 	if(timeloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'time'!\n");
 
-	float vertices[] = {
-		-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-		-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
-		-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-		-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
-		 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-		 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
-		 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-		 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
-		 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	};
-
-	unsigned int VBO, VAO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glGenBuffers(1, &ws.VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, ws.VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
+	glGenVertexArrays(1, &ws.VAO);
+	glBindVertexArray(ws.VAO);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
@@ -366,7 +367,7 @@ int main(void) {
 		frameCounter += 1;
 	}
 
-	glDeleteBuffers(1, &VBO);
-	glDeleteVertexArrays(1, &VAO);
+	glDeleteBuffers(1, &ws.VBO);
+	glDeleteVertexArrays(1, &ws.VAO);
 	exit(EXIT_SUCCESS);
 }
