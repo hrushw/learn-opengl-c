@@ -56,7 +56,7 @@ struct _glfw_winstate ws = {
 		.queue = {{0}}
 	},
 	.time = 0, .dt = 0,
-	.runstate = 1;
+	.runstate = 1
 };
 
 void _die(const char* fmt, ...);
@@ -305,7 +305,7 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
 			ws.sp = genProgram("vertex.glsl", "fragment.glsl");
-		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == GLFW_MOD_CONTROL | GLFW_MOD_SHIFT)
+		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
 	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
