@@ -30,7 +30,6 @@ struct _glfw_winstate {
 	const char* title;
 
 	unsigned int sp;
-	unsigned int VBO, VAO;
 
 	/* Mouse x, y position */
 	double mx, my;
@@ -335,7 +334,5 @@ int main(void) {
 		evalqueue(&ws.iq);
 	}
 
-	glDeleteBuffers(1, &ws.VBO);
-	glDeleteVertexArrays(1, &ws.VAO);
 	exit(EXIT_SUCCESS);
 }
