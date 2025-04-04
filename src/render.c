@@ -56,6 +56,11 @@ struct _glfw_winstate ws = {
 	.time = 0, .dt = 0
 };
 
+void _die(const char* fmt, ...);
+void evalqueue(struct _glfw_inputqueue *);
+void _iqcheck(struct _glfw_inputqueue *);
+void _iqappend(struct _glfw_inputqueue *q, int, int, int, double, double, double);
+
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
 }
@@ -72,17 +77,15 @@ void _die(const char* fmt, ...) {
 	exit(EXIT_FAILURE);
 }
 
-/* Immediately exit on any error encountered by GLFW */
-void _glfw_callback_error(int err, const char* desc) {
-	_die("GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
-}
-
 void _iqcheck(struct _glfw_inputqueue *q) {
 	/* Bounds check for queue just in case */
 	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(q->end == q->start + IQSZ_) _die("ERROR: Key press queue overflow!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
+	if(q->end == q->start + IQSZ_) {
+		fprintf(stderr, "ERROR: Key press queue overflow - clearing queue!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
+		evalqueue(q);
+	}
 }
 
 void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
@@ -101,6 +104,12 @@ void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double
 
 	q->end += 1;
 	q->end %= 2*IQSZ_;
+}
+
+
+/* Immediately exit on any error encountered by GLFW */
+void _glfw_callback_error(int err, const char* desc) {
+	_die("GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
 }
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
@@ -246,7 +255,6 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Failed to compile shader of type '%s'! Error log:\n%s\n", typename, infolog);
 	}
-
 
 	return s;
 }
