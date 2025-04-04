@@ -9,19 +9,6 @@
 
 enum { IQSZ_ = 256, MAXFSZ_ = 1 << 26 };
 
-/* Vertex data */
-float vertices[] = {
-	-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
-	-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
-	 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
-	 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-	 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
-	 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
-};
-
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -143,6 +130,13 @@ void _glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int m
 	(void)window;
 }
 
+void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
+	ws.width = width;
+	ws.height = height;
+
+	(void)window;
+}
+
 /* Create window - optionally maximize and make it fullscreen */
 /*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
 void _glfw_create_window(struct _glfw_winstate *wst, int fullscreen, int windowed) {
@@ -192,6 +186,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwSetKeyCallback(wst->win, _glfw_callback_key);
 	glfwSetCursorPosCallback(wst->win, _glfw_callback_cursorpos);
 	glfwSetMouseButtonCallback(wst->win, _glfw_callback_mouseclick);
+	glfwSetFramebufferSizeCallback(wst->win, _glfw_callback_fbresize);
 
 	glfwMakeContextCurrent(wst->win);
 	glfwSwapInterval(1);
@@ -305,6 +300,19 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	q->end = 0;
 }
 
+/* Vertex data */
+float vertices[] = {
+	-0.8f, -0.4f, -0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	-0.6f,  0.4f, -0.3f,  0.24f,  0.5f, 0.3f, 0.2f,  0.33f,   0.9f,
+	-0.4f, -0.4f, -0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	-0.2f,  0.4f, -0.1f,  0.51f,  0.2f, 0.7f, 0.2f, -0.41f,   1.0f,
+	 0.0f, -0.4f,  0.0f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	 0.2f,  0.4f,  0.1f,  0.15f,  0.1f, 0.3f, 0.4f,  0.75f,   2.1f,
+	 0.4f, -0.4f,  0.2f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+	 0.6f,  0.4f,  0.3f,  0.39f,  0.5f, 0.4f, 0.3f,  0.21f,   1.7f,
+	 0.8f, -0.4f,  0.4f,   0.0f,  0.1f, 0.0f, 0.2f,   0.0f,   0.0f,
+};
+
 /* Main function */
 int main(void) {
 	_glfw_initialize(&ws);
@@ -314,7 +322,6 @@ int main(void) {
 	/* (in order to allow hot reloading of shaders later) */
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
-
 
 	int timeloc = glGetUniformLocation(ws.sp, "time");
 	if(timeloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'time'!\n");
@@ -338,6 +345,7 @@ int main(void) {
 	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(8*sizeof(float)));
 
 	glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	int frameCounter = 0;
 	int run = 1;
@@ -349,7 +357,7 @@ int main(void) {
 		int pad = ( (ws.width > ws.height ? ws.width : ws.height) - len ) / 2;
 
 		ws.width < ws.height ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 		glUniform1f(timeloc, (float)(ws.time - t0));
 		glUseProgram(ws.sp);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 9);
@@ -358,7 +366,6 @@ int main(void) {
 
 
 		/* GLFW window handling */
-		glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
