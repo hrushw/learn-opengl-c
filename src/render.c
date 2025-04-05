@@ -317,8 +317,6 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	/* TODO: make the program continue even after shader compilation failure */
-	/* (in order to allow hot reloading of shaders later) */
 	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 	atexit(__glfw_program_delete);
 
