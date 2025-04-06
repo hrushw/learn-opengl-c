@@ -328,7 +328,7 @@ int main(void) {
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
-		updatetime(&ws.time, &ws.dt, &t0);
+		updatetime(&ws.time, &t0, &ws.dt);
 		evalqueue(&ws.iq);
 	}
 
