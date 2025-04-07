@@ -261,33 +261,37 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 	return s;
 }
 
-void addShader(unsigned int prog, unsigned int type, const char* path) {
+void addShader(unsigned int prog, unsigned int type, const char* path, char* infolog, int il_len) {
+		unsigned int shad = genShader(path, type, infolog, il_len);
+		glAttachShader(prog, shad);
+		glDeleteShader(shad);
+		glLinkProgram(prog);
+		glDetachShader(prog, shad);
+}
+
+/* Generate the shader program */
+unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	enum { il_len = 4096 };
-	char infolog[il_len + 1] = {0};
 	int success = 0;
+	char infolog[il_len + 1] = {0};
 
-	unsigned int shad = genShader(path, type, infolog, il_len);
-	glAttachShader(prog, shad);
-	glDeleteShader(shad);
-	glLinkProgram(prog);
-	glDetachShader(prog, shad);
+	unsigned int sp = glCreateProgram();
 
-	glGetProgramiv(prog, GL_LINK_STATUS, &success);
+	/* generate vertex and fragment shader */
+	addShader(sp, GL_VERTEX_SHADER, vertpath, infolog, il_len);
+	addShader(sp, GL_FRAGMENT_SHADER, fragpath, infolog, il_len);
+
+	/* check program linking status */
+	glGetProgramiv(sp, GL_LINK_STATUS, &success);
 	if(!success) {
 		int gl_il_len;
-		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &gl_il_len);
+		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 		if(gl_il_len > il_len) fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
-		glGetProgramInfoLog(prog, il_len, NULL, infolog);
+		glGetProgramInfoLog(sp, il_len, NULL, infolog);
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 	}
-}
-
-void genProgram() {
-	ws.sp = glCreateProgram();
-	addShader(ws.sp, GL_VERTEX_SHADER, "vertex.glsl");
-	addShader(ws.sp, GL_FRAGMENT_SHADER, "fragment.glsl");
-	atexit(__glfw_program_delete);
+	return sp;
 }
 
 void updatetime(double *time, double *t0, double *dt) {
@@ -300,7 +304,7 @@ void updatetime(double *time, double *t0, double *dt) {
 void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
-			genProgram();
+			ws.sp = genProgram("vertex.glsl", "fragment.glsl");
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
@@ -314,10 +318,12 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	genProgram();
+	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+	atexit(__glfw_program_delete);
 
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
+
 
 		/* GLFW window handling */
 		glfwSwapBuffers(ws.win);
