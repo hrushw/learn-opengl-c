@@ -258,6 +258,9 @@ unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_
 			case GL_FRAGMENT_SHADER:
 				typename = "GL_FRAGMENT_SHADER";
 				break;
+			case GL_GEOMETRY_SHADER:
+				typename = "GL_GEOMETRY_SHADER";
+				break;
 			default:
 				typename = "<unknown>";
 		}
@@ -302,6 +305,7 @@ void genProgram(void) {
 
 	/* generate vertex and fragment shader */
 	glAttachShader(ws.sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, ws.infolog, LOGSZ_));
+	glAttachShader(ws.sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, ws.infolog, LOGSZ_));
 	glAttachShader(ws.sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, ws.infolog, LOGSZ_));
 
 	glLinkProgram(ws.sp);
@@ -358,7 +362,7 @@ int main(void) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(ws.sp);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_POINTS, 0, 3);
 
 
 		/* GLFW window handling */
