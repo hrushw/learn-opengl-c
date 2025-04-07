@@ -7,7 +7,10 @@
 #include <string.h>
 #include <stdarg.h>
 
-enum { IQSZ_ = 256, MAXFSZ_ = 1 << 26 };
+enum { IQSZ_ = 256 };
+enum { LOGSZ_ = 4096 };
+enum { MAXSHADERS_ = 16 };
+enum { MAXFSZ_ = 1 << 26 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -34,13 +37,15 @@ struct _glfw_winstate {
 	/* Mouse x, y position */
 	double mx, my;
 
-	/* Queue of keypresses to evaluate at once */
-	struct _glfw_inputqueue iq;
-	
 	double time;
 	double dt;
 
 	int runstate;
+
+	/* Queue of keypresses to evaluate at once */
+	struct _glfw_inputqueue iq;
+
+	char infolog[LOGSZ_];
 };
 
 struct _glfw_winstate ws = {
@@ -55,7 +60,8 @@ struct _glfw_winstate ws = {
 		.queue = {{0}}
 	},
 	.time = 0, .dt = 0,
-	.runstate = 1
+	.runstate = 1,
+	.infolog = {0}
 };
 
 void _die(const char* fmt, ...);
@@ -150,7 +156,7 @@ void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 
 /* Create window - optionally maximize and make it fullscreen */
 /*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
-void _glfw_create_window(struct _glfw_winstate *wst, int fullscreen, int windowed) {
+void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 	/* _die() is not used here, _glfw_callback_error should already handle error messages and exit */
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
@@ -191,7 +197,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
 
-	_glfw_create_window(wst, 0, 1);
+	_glfw_crwin(wst, 0, 1);
 	atexit(__glfw_window_destroy);
 
 	glfwSetKeyCallback(wst->win, _glfw_callback_key);
@@ -204,7 +210,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 }
 
 /* Function to read file contents into dynamically allocated buffer with too many checks */
-char* filetobuf(const char* path, int* len) {
+char* _io_filetobuf(const char* path, int* len) {
 	FILE* f = fopen(path, "rb");
 	if(!f) _die("ERROR: Failed to open file '%s'!\n", path);
 	if(fseek(f, 0L, SEEK_END) == -1) _die("ERROR: Failed to seek to end of file '%s'!\n", path);
@@ -225,8 +231,8 @@ char* filetobuf(const char* path, int* len) {
 	return buf;
 }
 
-unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len) {
-	char* src = filetobuf(path, NULL);
+unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_len) {
+	char* src = _io_filetobuf(path, NULL);
 	unsigned int s = glCreateShader(type);
 	int success = 0;
 
@@ -241,7 +247,8 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 		int gl_il_len;
 		const char* typename;
 		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len) fprintf(stderr, "ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
+		if(gl_il_len > il_len)
+			fprintf(stderr, "ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
 		glGetShaderInfoLog(s, il_len, NULL, infolog);
 		/* get type of shader for which compilation fails */
 		switch(type) {
@@ -261,36 +268,45 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 	return s;
 }
 
-void addShader(unsigned int prog, unsigned int type, const char* path, char* infolog, int il_len) {
-		unsigned int shad = genShader(path, type, infolog, il_len);
-		glAttachShader(prog, shad);
-		glDeleteShader(shad);
-}
-
-/* Generate the shader program */
-unsigned int genProgram(const char* vertpath, const char* fragpath) {
-	enum { il_len = 4096 };
+void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	int success = 0;
-	char infolog[il_len + 1] = {0};
 
-	unsigned int sp = glCreateProgram();
-
-	/* generate vertex and fragment shader */
-	addShader(sp, GL_VERTEX_SHADER, vertpath, infolog, il_len);
-	addShader(sp, GL_FRAGMENT_SHADER, fragpath, infolog, il_len);
-	glLinkProgram(sp);
-
-	/* check program linking status */
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
 	if(!success) {
 		int gl_il_len;
 		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len) fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)", gl_il_len, il_len);
-		glGetProgramInfoLog(sp, il_len, NULL, infolog);
+		if(gl_il_len > il_len)
+			fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+		glGetProgramInfoLog(ws.sp, il_len, NULL, infolog);
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 	}
-	return sp;
+}
+
+void _gl_cleanshaders(unsigned int sp) {
+	int n;
+	unsigned int shaders[MAXSHADERS_];
+	glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n);
+
+	if(n > MAXSHADERS_) _die("ERROR: Too many shaders! (number of shaders = %d, max = %d)\n");
+	glGetAttachedShaders(sp, MAXSHADERS_, NULL, shaders);
+	for(int i = 0; i < n; ++i) {
+		glDetachShader(sp, shaders[i]);
+		glDeleteShader(shaders[i]);
+	}
+}
+
+/* Generate the shader program */
+void genProgram(void) {
+	ws.sp = glCreateProgram();
+
+	/* generate vertex and fragment shader */
+	glAttachShader(ws.sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, ws.infolog, LOGSZ_));
+	glAttachShader(ws.sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, ws.infolog, LOGSZ_));
+
+	glLinkProgram(ws.sp);
+	_gl_cleanshaders(ws.sp);
+	_gl_chklink(ws.sp, ws.infolog, LOGSZ_);
 }
 
 void updatetime(double *time, double *t0, double *dt) {
@@ -303,7 +319,7 @@ void updatetime(double *time, double *t0, double *dt) {
 void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
-			ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+			genProgram();
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
@@ -312,16 +328,37 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	q->end = 0;
 }
 
+float vertices[] = {
+	 0.0f,  0.5f,
+	-0.2f, -0.1f,
+	 0.4f, -0.2f,
+};
+
 /* Main function */
 int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	ws.sp = genProgram("vertex.glsl", "fragment.glsl");
+	genProgram();
 	atexit(__glfw_program_delete);
+
+	unsigned int VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
 	double t0 = glfwGetTime();
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
+		glViewport(0, 0, ws.width, ws.height);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glUseProgram(ws.sp);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 
 		/* GLFW window handling */
