@@ -261,24 +261,24 @@ unsigned int genShader(const char* path, GLenum type, char* infolog, int il_len)
 	return s;
 }
 
+void addShader(unsigned int prog, unsigned int type, const char* path, char* infolog, int il_len) {
+		unsigned int shad = genShader(path, type, infolog, il_len);
+		glAttachShader(prog, shad);
+		glDeleteShader(shad);
+}
+
 /* Generate the shader program */
 unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	enum { il_len = 4096 };
 	int success = 0;
 	char infolog[il_len + 1] = {0};
 
-	/* generate vertex and fragment shader */
-	unsigned int vert = genShader(vertpath, GL_VERTEX_SHADER, infolog, il_len);
-	unsigned int frag = genShader(fragpath, GL_FRAGMENT_SHADER, infolog, il_len);
-
 	unsigned int sp = glCreateProgram();
-	glAttachShader(sp, vert);
-	glAttachShader(sp, frag);
 
+	/* generate vertex and fragment shader */
+	addShader(sp, GL_VERTEX_SHADER, vertpath, infolog, il_len);
+	addShader(sp, GL_FRAGMENT_SHADER, fragpath, infolog, il_len);
 	glLinkProgram(sp);
-
-	glDeleteShader(vert);
-	glDeleteShader(frag);
 
 	/* check program linking status */
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
