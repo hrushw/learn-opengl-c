@@ -265,6 +265,8 @@ void addShader(unsigned int prog, unsigned int type, const char* path, char* inf
 		unsigned int shad = genShader(path, type, infolog, il_len);
 		glAttachShader(prog, shad);
 		glDeleteShader(shad);
+		glLinkProgram(prog);
+		glDetachShader(prog, shad);
 }
 
 /* Generate the shader program */
@@ -278,7 +280,6 @@ unsigned int genProgram(const char* vertpath, const char* fragpath) {
 	/* generate vertex and fragment shader */
 	addShader(sp, GL_VERTEX_SHADER, vertpath, infolog, il_len);
 	addShader(sp, GL_FRAGMENT_SHADER, fragpath, infolog, il_len);
-	glLinkProgram(sp);
 
 	/* check program linking status */
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
