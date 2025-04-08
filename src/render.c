@@ -280,7 +280,7 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 		if(gl_il_len > il_len)
 			fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-		glGetProgramInfoLog(ws.sp, il_len, NULL, infolog);
+		glGetProgramInfoLog(sp, il_len, NULL, infolog);
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 	}
@@ -336,6 +336,7 @@ float vertices[] = {
 	 0.0f,  0.5f,
 	-0.2f, -0.1f,
 	 0.4f, -0.2f,
+	 -0.6f, 0.4f,
 };
 
 /* Main function */
@@ -362,7 +363,7 @@ int main(void) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(ws.sp);
-		glDrawArrays(GL_POINTS, 0, 3);
+		glDrawArrays(GL_POINTS, 0, 4);
 
 
 		/* GLFW window handling */
