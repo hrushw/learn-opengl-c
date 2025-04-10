@@ -53,14 +53,18 @@ struct _glfw_winstate ws = {
 	.width = 640, .height = 480,
 	.title = "Waves",
 
+	.sp = 0,
 	.mx = 0, .my = 0,
+
+	.time = 0, .dt = 0,
+
+	.runstate = 1,
 
 	.iq = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
 	},
-	.time = 0, .dt = 0,
-	.runstate = 1,
+
 	.infolog = {0}
 };
 
@@ -301,6 +305,7 @@ void _gl_cleanshaders(unsigned int sp) {
 
 /* Generate the shader program */
 void genProgram(void) {
+	__glfw_program_delete();
 	ws.sp = glCreateProgram();
 
 	/* generate vertex and fragment shader */
@@ -336,7 +341,7 @@ float vertices[] = {
 	 0.0f,  0.5f,
 	-0.2f, -0.1f,
 	 0.4f, -0.2f,
-	 -0.6f, 0.4f,
+	-0.6f, 0.4f,
 };
 
 /* Main function */
