@@ -7,10 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-enum { IQSZ_ = 256 };
-enum { LOGSZ_ = 4096 };
-enum { MAXSHADERS_ = 16 };
-enum { MAXFSZ_ = 1 << 26 };
+enum { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 26 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -51,7 +48,7 @@ struct _glfw_winstate {
 struct _glfw_winstate ws = {
 	.win = NULL,
 	.width = 640, .height = 480,
-	.title = "Waves",
+	.title = "Pentagon",
 
 	.sp = 0,
 	.mx = 0, .my = 0,
@@ -67,11 +64,6 @@ struct _glfw_winstate ws = {
 
 	.infolog = {0}
 };
-
-void _die(const char* fmt, ...);
-void evalqueue(struct _glfw_inputqueue *);
-void _iqcheck(struct _glfw_inputqueue *);
-void _iqappend(struct _glfw_inputqueue *q, int, int, int, double, double, double);
 
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
@@ -89,14 +81,23 @@ void _die(const char* fmt, ...) {
 	exit(EXIT_FAILURE);
 }
 
+void _iqclear(struct _glfw_inputqueue *q) {
+	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
+	q->start = 0;
+	q->end = 0;
+}
+
 void _iqcheck(struct _glfw_inputqueue *q) {
 	/* Bounds check for queue just in case */
-	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_) _die("ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
+	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_) {
+		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
+		_iqclear(q);
+	}
 
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
 	if(q->end == q->start + IQSZ_) {
 		fprintf(stderr, "ERROR: Key press queue overflow - clearing queue!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
-		evalqueue(q);
+		_iqclear(q);
 	}
 }
 
@@ -213,6 +214,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwSwapInterval(1);
 }
 
+/* TODO cleanup this function to not cause program exit */
 /* Function to read file contents into dynamically allocated buffer with too many checks */
 char* _io_filetobuf(const char* path, int* len) {
 	FILE* f = fopen(path, "rb");
@@ -332,9 +334,7 @@ void evalqueue(struct _glfw_inputqueue *q) {
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
-	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	q->start = 0;
-	q->end = 0;
+	_iqclear(q);
 }
 
 float vertices[] = {
