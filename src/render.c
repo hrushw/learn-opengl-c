@@ -307,18 +307,19 @@ void _gl_cleanshaders(unsigned int sp) {
 }
 
 /* Generate the shader program */
-void genProgram(void) {
+unsigned int genProgram(int arg) {
 	__glfw_program_delete();
-	ws.sp = glCreateProgram();
+	unsigned int sp = glCreateProgram();
 
 	/* generate vertex and fragment shader */
-	glAttachShader(ws.sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, ws.infolog, LOGSZ_));
-	glAttachShader(ws.sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, ws.infolog, LOGSZ_));
-	glAttachShader(ws.sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, ws.infolog, LOGSZ_));
+	glAttachShader(sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, ws.infolog, LOGSZ_));
+	if(arg) glAttachShader(sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, ws.infolog, LOGSZ_));
+	glAttachShader(sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, ws.infolog, LOGSZ_));
 
-	glLinkProgram(ws.sp);
-	_gl_cleanshaders(ws.sp);
-	_gl_chklink(ws.sp, ws.infolog, LOGSZ_);
+	glLinkProgram(sp);
+	_gl_cleanshaders(sp);
+	_gl_chklink(sp, ws.infolog, LOGSZ_);
+	return sp;
 }
 
 void updatetime(double *time, double *t0, double *dt) {
@@ -330,8 +331,8 @@ void updatetime(double *time, double *t0, double *dt) {
 /* Currently only clears the queue and resets indices */
 void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
-		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
-			genProgram();
+//		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
+//			genProgram();
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
@@ -361,8 +362,8 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	genProgram();
-	atexit(__glfw_program_delete);
+	unsigned int sp1 = genProgram(0), sp2 = genProgram(1);
+	//atexit(__glfw_program_delete);
 
 	unsigned int VAO, VBO;
 	glGenVertexArrays(1, &VAO);
@@ -382,8 +383,10 @@ int main(void) {
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
-		glUseProgram(ws.sp);
-		glDrawArrays(GL_POINTS, 0, 4);
+		glUseProgram(sp2);
+		glDrawArrays(GL_POINTS, 0, 3);
+		glUseProgram(sp1);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		/* GLFW window handling */
 		glfwSwapBuffers(ws.win);
