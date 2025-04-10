@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <math.h>
 
 enum { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 26 };
 
@@ -337,12 +338,23 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	_iqclear(q);
 }
 
+void rotate2df(float pos[2], float out[2], double angle) {
+	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
+	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
+}
+
 float vertices[] = {
 	 0.0f,  0.5f,
 	-0.2f, -0.1f,
 	 0.4f, -0.2f,
-	-0.6f, 0.4f,
+	-0.6f, 0.8f,
 };
+
+void rotate2darrf(float *arr, float* out, int len, double time) {
+	for(int i = 0; i < len; ++i) {
+		rotate2df(&arr[2*i], &out[2*i], time);
+	}
+}
 
 /* Main function */
 int main(void) {
@@ -359,17 +371,19 @@ int main(void) {
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
 	double t0 = glfwGetTime();
+	rotate2darrf(vertices, vrot, 4, ws.time);
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(ws.sp);
 		glDrawArrays(GL_POINTS, 0, 4);
-
 
 		/* GLFW window handling */
 		glfwSwapBuffers(ws.win);
@@ -377,7 +391,11 @@ int main(void) {
 
 		updatetime(&ws.time, &t0, &ws.dt);
 		evalqueue(&ws.iq);
+		rotate2darrf(vertices, vrot, 4, ws.time);
 	}
 
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &VAO);
 	exit(EXIT_SUCCESS);
 }
