@@ -5,12 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include <math.h>
 
-enum { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 24 };
+enum _Sizes { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 24 };
 
-char srcbuf[MAXFSZ_] = {0};
+char g_srcbuf[MAXFSZ_] = {0};
+char g_errlog[LOGSZ_] = {0};
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -45,7 +45,6 @@ struct _glfw_winstate {
 	/* Queue of keypresses to evaluate at once */
 	struct _glfw_inputqueue iq;
 
-	char infolog[LOGSZ_];
 };
 
 struct _glfw_winstate ws = {
@@ -64,24 +63,10 @@ struct _glfw_winstate ws = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
 	},
-
-	.infolog = {0}
 };
 
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
-}
-
-void __glfw_program_delete(void) {
-	glDeleteProgram(ws.sp);
-}
-
-void _die(const char* fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	vfprintf(stderr, fmt, va);
-	va_end(va);
-	exit(EXIT_FAILURE);
 }
 
 void _iqclear(struct _glfw_inputqueue *q) {
@@ -125,7 +110,8 @@ void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double
 
 /* Immediately exit on any error encountered by GLFW */
 void _glfw_callback_error(int err, const char* desc) {
-	_die("GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+	exit(EXIT_FAILURE);
 }
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
@@ -165,7 +151,6 @@ void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 /* Create window - optionally maximize and make it fullscreen */
 /*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
 void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
-	/* _die() is not used here, _glfw_callback_error should already handle error messages and exit */
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
 
@@ -255,13 +240,11 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
 	}
-
-
 }
 
-unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_len) {
+unsigned int _gl_genshader(const char* path, GLenum type, char* srcbuf, int srcbuf_sz, char* infolog, int il_len) {
 	int len = 0;
-	_io_filetobuf(path, &len, srcbuf, MAXFSZ_);
+	_io_filetobuf(path, &len, srcbuf, srcbuf_sz);
 	unsigned int s = glCreateShader(type);
 
 	char *bufloc = srcbuf;
@@ -294,29 +277,28 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 void _gl_cleanshaders(unsigned int sp) {
 	int n;
 	unsigned int shaders[MAXSHADERS_];
-	glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n);
 
-	if(n > MAXSHADERS_) _die("ERROR: Too many shaders! (number of shaders = %d, max = %d)\n");
-	glGetAttachedShaders(sp, MAXSHADERS_, NULL, shaders);
-	for(int i = 0; i < n; ++i) {
-		glDetachShader(sp, shaders[i]);
-		glDeleteShader(shaders[i]);
+	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n) {
+		glGetAttachedShaders(sp, MAXSHADERS_, NULL, shaders);
+		for(int i = 0; i < n; ++i) {
+			glDetachShader(sp, shaders[i]);
+			glDeleteShader(shaders[i]);
+		}
 	}
 }
 
 /* Generate the shader program */
 unsigned int genProgram(int arg) {
-	__glfw_program_delete();
 	unsigned int sp = glCreateProgram();
 
 	/* generate vertex and fragment shader */
-	glAttachShader(sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, ws.infolog, LOGSZ_));
-	if(arg) glAttachShader(sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, ws.infolog, LOGSZ_));
-	glAttachShader(sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, ws.infolog, LOGSZ_));
+	glAttachShader(sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
+	if(arg) glAttachShader(sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
+	glAttachShader(sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
 
 	glLinkProgram(sp);
 	_gl_cleanshaders(sp);
-	_gl_chklink(sp, ws.infolog, LOGSZ_);
+	_gl_chklink(sp, g_errlog, LOGSZ_);
 	return sp;
 }
 
@@ -362,7 +344,6 @@ int main(void) {
 
 	unsigned int sp1 = genProgram(0);
 	unsigned int sp2 = genProgram(1);
-	//atexit(__glfw_program_delete);
 
 	unsigned int VAO, VBO;
 	glGenVertexArrays(1, &VAO);
