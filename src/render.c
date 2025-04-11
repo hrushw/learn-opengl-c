@@ -52,9 +52,7 @@ struct _glfw_winstate ws = {
 char g_charbuf[CHBUFSZ_] = {0};
 
 /* Destroy global window - wrapper function for atexit */
-void __glfw_window_destroy(void) {
-	glfwDestroyWindow(ws.win);
-}
+void __glfw_window_destroy(void) { glfwDestroyWindow(ws.win); }
 
 /* Reset input queue */
 void _iqclear(struct _glfw_inputqueue *q) {
@@ -135,10 +133,8 @@ void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 
 		wst->width = mode->width, wst->height = mode->height;
 	}
-	if(fullscreen && windowed)
-		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-	if(windowed)
-		mon = NULL;
+	if(fullscreen && windowed) glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+	if(windowed) mon = NULL;
 
 	wst->win = glfwCreateWindow(wst->width, wst->height, wst->title, mon, NULL);
 	if(!wst->win) exit(EXIT_FAILURE);
@@ -199,7 +195,6 @@ void _io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 /* Check if shader was compiled successfully */
 void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	int success = 0;
-
 	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
 	if(success) return;
 
@@ -207,10 +202,8 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
 		fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-
 	glGetShaderInfoLog(s, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
-
 	fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
 }
 
@@ -221,11 +214,8 @@ unsigned int _gl_genshader(const char* path, int type, char* charbuf, int charbu
 	_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
 	memset(charbuf, 0, len+1);
-
 	glCompileShader(s);
-
 	_gl_chkcmp(s, charbuf, charbufsz);
-
 	return s;
 }
 
@@ -282,6 +272,9 @@ unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
 /* Wrapper macro adding terminating 0 */
 #define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
 
+void updatetime(double *time, double *t0, double *dt) {
+	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
+}
 
 enum proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE_1, PROG_USE_2 };
 
@@ -309,26 +302,13 @@ void proghandler(enum proghandlemethod method) {
 			break;
 
 		case PROG_USE_1:
-			glUseProgram(sp1);
-			break;
+			glUseProgram(sp1); break;
+
 		case PROG_USE_2:
 			glUseProgram(sp2);
 			glUniform1f(time_loc, (float)ws.time);
 			break;
 	}
-}
-
-void updatetime(double *time, double *t0, double *dt) {
-	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
-}
-
-void rotate2df(float pos[2], float out[2], double angle) {
-	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
-	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
-}
-
-void rotate2darrf(float *arr, float* out, int len, double time) {
-	for(int i = 0; i < len; ++i) rotate2df(&arr[2*i], &out[2*i], time);
 }
 
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
@@ -341,6 +321,16 @@ void evalqueue(struct _glfw_inputqueue *q) {
 	}
 	_iqclear(q);
 }
+
+void rotate2df(float pos[2], float out[2], double angle) {
+	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
+	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
+}
+
+void rotate2darrf(float *arr, float* out, int len, double time) {
+	for(int i = 0; i < len; ++i) rotate2df(&arr[2*i], &out[2*i], time);
+}
+
 
 float vertices[] = {
 	 0.0f,  0.5f,   -0.2f, -0.1f,    0.4f, -0.2f,
