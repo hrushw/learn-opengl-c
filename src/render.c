@@ -355,7 +355,9 @@ float vertices[] = {
 	 0.0f,  0.5f,
 	-0.2f, -0.1f,
 	 0.4f, -0.2f,
-	-0.6f, 0.8f,
+	-0.6f,  0.8f,
+	 0.5f,  0.0f,
+	-0.8f,  0.2f,
 };
 
 void rotate2darrf(float *arr, float* out, int len, double time) {
@@ -368,60 +370,73 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
+	/* Shaders */
 	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER);
 	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER);
 	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER);
 
+	/* Shader Programs */
 	unsigned int sp1 = _gl_GenProgram(vert, frag);
 	unsigned int sp2 = _gl_GenProgram(vert, geom, frag);
 
 	_gl_cleanprogshaders(sp1);
 	_gl_cleanprogshaders(sp2);
 
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-
+	/* Vertex buffer object */
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
-
-	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
-	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	/* Vertex Array Object */
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
 	glEnableVertexAttribArray(0);
+
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
+	/* Uniform location */
 	int time_loc = glGetUniformLocation(sp2, "time");
 	if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
 
+	/* Map array buffer to memory */
+	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+	/* Initialize time and loop */
 	double t0 = glfwGetTime();
-	rotate2darrf(vertices, vrot, 4, ws.time);
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
+		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		/* Use program 2 - with geometry shader (pentagons) */
 		glUseProgram(sp2);
 		glUniform1f(time_loc, (float)ws.time);
-		glDrawArrays(GL_POINTS, 0, 3);
+		glDrawArrays(GL_POINTS, 0, 6);
 
+		/* Use program 1 - without geometry shader (triangles) */
 		glUseProgram(sp1);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
 		glfwSwapBuffers(ws.win);
 		glfwPollEvents();
 
+		/* Other computations */
 		updatetime(&ws.time, &t0, &ws.dt);
 		evalqueue(&ws.iq);
-		rotate2darrf(vertices, vrot, 4, ws.time);
+		rotate2darrf(vertices, vrot, 6, ws.time);
 	}
 
+	/* Cleanup */
 	glDeleteProgram(sp1);
 	glDeleteProgram(sp2);
+
 	glUnmapBuffer(GL_ARRAY_BUFFER);
+
 	glDeleteBuffers(1, &VBO);
 	glDeleteVertexArrays(1, &VAO);
+
 	exit(EXIT_SUCCESS);
 }
