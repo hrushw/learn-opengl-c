@@ -10,8 +10,6 @@
 
 enum _Sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 24 };
 
-char g_charbuf[CHBUFSZ_] = {0};
-
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
 	int key;
@@ -47,6 +45,7 @@ struct _glfw_winstate {
 	struct _glfw_inputqueue iq;
 };
 
+
 /* Window state - global structure */
 struct _glfw_winstate ws = {
 	.win = NULL,
@@ -65,11 +64,14 @@ struct _glfw_winstate ws = {
 		.queue = {{0}}
 	},
 };
+char g_charbuf[CHBUFSZ_] = {0};
+
 
 /* Destroy global window - wrapper function for atexit */
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
 }
+
 
 /* Reset input queue */
 void _iqclear(struct _glfw_inputqueue *q) {
@@ -150,6 +152,7 @@ void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 	(void)window;
 }
 
+
 /* Create window - optionally maximize and make it fullscreen */
 void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
@@ -202,6 +205,7 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwMakeContextCurrent(wst->win);
 	glfwSwapInterval(1);
 }
+
 
 /* Read file into buffer */
 /* No longer causes program exit on failure */
@@ -322,42 +326,6 @@ unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
 #define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0);
 
 
-void updatetime(double *time, double *t0, double *dt) {
-	*time = glfwGetTime();
-	*dt = *time - *t0;
-	*t0 = *time;
-}
-
-/* Currently only clears the queue and resets indices */
-void evalqueue(struct _glfw_inputqueue *q) {
-	for(int i = q->start; i != q->end; ++i) {
-//		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
-//			genProgram();
-		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
-			ws.runstate = 0;
-	}
-	_iqclear(q);
-}
-
-void rotate2df(float pos[2], float out[2], double angle) {
-	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
-	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
-}
-
-float vertices[] = {
-	 0.0f,  0.5f,
-	-0.2f, -0.1f,
-	 0.4f, -0.2f,
-	-0.6f,  0.8f,
-	 0.5f,  0.0f,
-	-0.8f,  0.2f,
-};
-
-void rotate2darrf(float *arr, float* out, int len, double time) {
-	for(int i = 0; i < len; ++i)
-		rotate2df(&arr[2*i], &out[2*i], time);
-}
-
 enum proghandlemethod {
 	PROG_GEN, PROG_DEL,
 	PROG_USE_1, PROG_USE_2
@@ -405,6 +373,42 @@ void proghandler(enum proghandlemethod method) {
 			break;
 	}
 }
+
+void updatetime(double *time, double *t0, double *dt) {
+	*time = glfwGetTime();
+	*dt = *time - *t0;
+	*t0 = *time;
+}
+
+void rotate2df(float pos[2], float out[2], double angle) {
+	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
+	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
+}
+
+void rotate2darrf(float *arr, float* out, int len, double time) {
+	for(int i = 0; i < len; ++i)
+		rotate2df(&arr[2*i], &out[2*i], time);
+}
+
+/* Currently only clears the queue and resets indices */
+void evalqueue(struct _glfw_inputqueue *q) {
+	for(int i = q->start; i != q->end; ++i) {
+		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
+			proghandler(PROG_GEN);
+		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
+			ws.runstate = 0;
+	}
+	_iqclear(q);
+}
+
+float vertices[] = {
+	 0.0f,  0.5f,
+	-0.2f, -0.1f,
+	 0.4f, -0.2f,
+	-0.6f,  0.8f,
+	 0.5f,  0.0f,
+	-0.8f,  0.2f,
+};
 
 /* Main function */
 int main(void) {
