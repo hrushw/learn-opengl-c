@@ -8,7 +8,9 @@
 #include <stdarg.h>
 #include <math.h>
 
-enum { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 26 };
+enum { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 24 };
+
+char srcbuf[MAXFSZ_] = {0};
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -215,27 +217,28 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 	glfwSwapInterval(1);
 }
 
-/* TODO cleanup this function to not cause program exit */
-/* Function to read file contents into dynamically allocated buffer with too many checks */
-char* _io_filetobuf(const char* path, int* len) {
+/* Read file into buffer */
+/* No longer causes program exit on failure */
+void _io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* f = fopen(path, "rb");
-	if(!f) _die("ERROR: Failed to open file '%s'!\n", path);
-	if(fseek(f, 0L, SEEK_END) == -1) _die("ERROR: Failed to seek to end of file '%s'!\n", path);
-	long l = ftell(f);
-	if(l < 0) _die("ERROR: Failed to get size of file '%s'\n", path);
-	if(l > MAXFSZ_ - 1) _die("ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, MAXFSZ_ - 1);
+	long l;
+	if(!f) {
+		fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
+		return;
+	} else if( fseek(f, 0L, SEEK_END) == -1 )
+		fprintf(stderr, "ERROR: Failed to seek to end of file '%s'!\n", path);
+	else if( (l = ftell(f)) < 0 )
+		fprintf(stderr, "ERROR: Failed to get size of file '%s'\n", path);
+	else if( l > buflen - 1 )
+		fprintf(stderr, "ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, buflen - 1);
+	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
+		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
+	else {
+		buf[l] = 0;
+		if(len) *len = l;
+	}
 
-	rewind(f);
-
-	char* buf = malloc((l + 1)*sizeof(char));
-	if(!buf) _die("ERROR: Unable to allocate memory of size '%d' bytes!\n", l+1);
-	if(fread(buf, sizeof(char), l, f) != (size_t)l) _die("ERROR: Error occured while reading file '%s'!\n", path);
-	buf[l] = 0;
-
-	if(fclose(f)) _die("ERROR: Unable to close file '%s'\n", path);
-
-	if(len) *len = l;
-	return buf;
+	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 }
 
 void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
@@ -257,11 +260,13 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 }
 
 unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_len) {
-	char* src = _io_filetobuf(path, NULL);
+	int len = 0;
+	_io_filetobuf(path, &len, srcbuf, MAXFSZ_);
 	unsigned int s = glCreateShader(type);
 
-	glShaderSource(s, 1, (const char**)&src, NULL);;
-	free(src);
+	char *bufloc = srcbuf;
+	glShaderSource(s, 1, (const char**)(&bufloc), NULL);;
+	memset(bufloc, 0, len);
 
 	glCompileShader(s);
 
@@ -355,7 +360,8 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	unsigned int sp1 = genProgram(0), sp2 = genProgram(1);
+	unsigned int sp1 = genProgram(0);
+	unsigned int sp2 = genProgram(1);
 	//atexit(__glfw_program_delete);
 
 	unsigned int VAO, VBO;
@@ -372,7 +378,7 @@ int main(void) {
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
 	int time_loc = glGetUniformLocation(sp2, "time");
-	if(time_loc < 0) _die("ERROR: Unable to get uniform location!\n");
+	if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
 
 	double t0 = glfwGetTime();
 	rotate2darrf(vertices, vrot, 4, ws.time);
