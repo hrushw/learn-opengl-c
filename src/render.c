@@ -228,6 +228,7 @@ void _io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 }
 
+/* Check if shader was compiled successfully */
 void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	int success = 0;
 
@@ -245,7 +246,8 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
 }
 
-unsigned int _gl_genshader(const char* path, GLenum type, char* srcbuf, int srcbuf_sz, char* infolog, int il_len) {
+/* Generate shader from file path - general function */
+unsigned int _gl_genshader_g(const char* path, int type, char* srcbuf, int srcbuf_sz, char* infolog, int il_len) {
 	int len = 0;
 	_io_filetobuf(path, &len, srcbuf, srcbuf_sz);
 
@@ -262,6 +264,12 @@ unsigned int _gl_genshader(const char* path, GLenum type, char* srcbuf, int srcb
 	return s;
 }
 
+/* Wrapper function with global variables builtin */
+unsigned int _gl_genshader(const char* path, int type) {
+	return _gl_genshader_g(path, type, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
+}
+
+/* Check if program was linked successfully */
 void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	int success = 0;
 
@@ -279,7 +287,8 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
-void _gl_cleanshaders(unsigned int sp) {
+/* Get all shaders attached to a program, detach them and delete them */
+void _gl_cleanprogshaders(unsigned int sp) {
 	int n = 0;
 	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n) {
 		unsigned int s;
@@ -288,6 +297,37 @@ void _gl_cleanshaders(unsigned int sp) {
 		glDeleteShader(s);
 	}
 }
+
+/* Generate shader program - with va_arg */
+/* Arguments are terminated by 0 */
+unsigned int _gl_genprogram_v(char* infolog, int il_len, va_list args) {
+	unsigned int sp = glCreateProgram();
+
+	unsigned int s = va_arg(args, unsigned int);
+	while(s) {
+		glAttachShader(sp, s);
+		s = va_arg(args, unsigned int);
+	}
+
+	glLinkProgram(sp);
+	_gl_chklink(sp, infolog, il_len);
+
+	return sp;
+}
+
+/* Generate shader program - with variadic inputs */
+/* Arguments are terminated by 0 */
+unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
+	va_list args;
+	va_start(args, il_len);
+	unsigned int sp = _gl_genprogram_v(infolog, il_len, args);
+	va_end(args);
+	return sp;
+}
+
+/* Wrapper macro adding terminating 0 */
+#define _gl_GenProgram(...) _gl_genprogram(g_errlog, LOGSZ_, __VA_ARGS__ __VA_OPT__(,) 0);
+
 
 void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime();
@@ -323,43 +363,25 @@ void rotate2darrf(float *arr, float* out, int len, double time) {
 		rotate2df(&arr[2*i], &out[2*i], time);
 }
 
-unsigned int _gl_genprogram(unsigned int s, ...) {
-	unsigned int sp = glCreateProgram();
-
-	va_list va;
-	va_start(va, s);
-	while(s) {
-		if(!s) break;
-		glAttachShader(sp, s);
-		s = va_arg(va, unsigned int);
-	}
-	va_end(va);
-
-	glLinkProgram(sp);
-	_gl_chklink(sp, g_errlog, LOGSZ_);
-
-	return sp;
-}
-
-#define _gl_GenProgram(...) _gl_genprogram(__VA_ARGS__ __VA_OPT__(,) 0);
-
 /* Main function */
 int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
-	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
-	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
+	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER);
+	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER);
+	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER);
 
 	unsigned int sp1 = _gl_GenProgram(vert, frag);
 	unsigned int sp2 = _gl_GenProgram(vert, geom, frag);
 
-	_gl_cleanshaders(sp1);
-	_gl_cleanshaders(sp2);
+	_gl_cleanprogshaders(sp1);
+	_gl_cleanprogshaders(sp2);
 
-	unsigned int VAO, VBO;
+	unsigned int VAO;
 	glGenVertexArrays(1, &VAO);
+
+	unsigned int VBO;
 	glGenBuffers(1, &VBO);
 
 	glBindVertexArray(VAO);
@@ -379,9 +401,11 @@ int main(void) {
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
+
 		glUseProgram(sp2);
 		glUniform1f(time_loc, (float)ws.time);
 		glDrawArrays(GL_POINTS, 0, 3);
+
 		glUseProgram(sp1);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
@@ -394,6 +418,8 @@ int main(void) {
 		rotate2darrf(vertices, vrot, 4, ws.time);
 	}
 
+	glDeleteProgram(sp1);
+	glDeleteProgram(sp2);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
 	glDeleteVertexArrays(1, &VAO);
