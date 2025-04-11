@@ -8,10 +8,9 @@
 #include <stdarg.h>
 #include <math.h>
 
-enum _Sizes { IQSZ_ = 256, LOGSZ_ = 4096, MAXFSZ_ = 1 << 24 };
+enum _Sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 24 };
 
-char g_srcbuf[MAXFSZ_] = {0};
-char g_errlog[LOGSZ_] = {0};
+char g_charbuf[CHBUFSZ_] = {0};
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -247,26 +246,20 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 }
 
 /* Generate shader from file path - general function */
-unsigned int _gl_genshader_g(const char* path, int type, char* srcbuf, int srcbuf_sz, char* infolog, int il_len) {
+unsigned int _gl_genshader(const char* path, int type, char* charbuf, int charbufsz) {
 	int len = 0;
-	_io_filetobuf(path, &len, srcbuf, srcbuf_sz);
+	_io_filetobuf(path, &len, charbuf, charbufsz);
 
 	unsigned int s = glCreateShader(type);
 
-	char *bufloc = srcbuf;
-	glShaderSource(s, 1, (const char* const*)(&bufloc), NULL);;
-	memset(bufloc, 0, len+1);
+	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
+	memset(charbuf, 0, len+1);
 
 	glCompileShader(s);
 
-	_gl_chkcmp(s, infolog, il_len);
+	_gl_chkcmp(s, charbuf, charbufsz);
 
 	return s;
-}
-
-/* Wrapper function with global variables builtin */
-unsigned int _gl_genshader(const char* path, int type) {
-	return _gl_genshader_g(path, type, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
 }
 
 /* Check if program was linked successfully */
@@ -326,7 +319,7 @@ unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
 }
 
 /* Wrapper macro adding terminating 0 */
-#define _gl_GenProgram(...) _gl_genprogram(g_errlog, LOGSZ_, __VA_ARGS__ __VA_OPT__(,) 0);
+#define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0);
 
 
 void updatetime(double *time, double *t0, double *dt) {
@@ -371,9 +364,9 @@ int main(void) {
 	gladLoadGL(glfwGetProcAddress);
 
 	/* Shaders */
-	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER);
-	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER);
-	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER);
+	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_charbuf, CHBUFSZ_);
+	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_charbuf, CHBUFSZ_);
+	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_charbuf, CHBUFSZ_);
 
 	/* Shader Programs */
 	unsigned int sp1 = _gl_GenProgram(vert, frag);
