@@ -238,10 +238,27 @@ char* _io_filetobuf(const char* path, int* len) {
 	return buf;
 }
 
+void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
+	int success = 0;
+
+	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
+	if(!success) {
+		int gl_il_len;
+		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
+		if(gl_il_len > il_len)
+			fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+		glGetShaderInfoLog(s, il_len, NULL, infolog);
+		/* get type of shader for which compilation fails */
+		infolog[il_len-1] = 0;
+		fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
+	}
+
+
+}
+
 unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_len) {
 	char* src = _io_filetobuf(path, NULL);
 	unsigned int s = glCreateShader(type);
-	int success = 0;
 
 	glShaderSource(s, 1, (const char**)&src, NULL);;
 	free(src);
@@ -249,31 +266,7 @@ unsigned int _gl_genshader(const char* path, GLenum type, char* infolog, int il_
 	glCompileShader(s);
 
 	/* check shader compilation status */
-	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
-	if(!success) {
-		int gl_il_len;
-		const char* typename;
-		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len)
-			fprintf(stderr, "ERROR: Unable to get shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-		glGetShaderInfoLog(s, il_len, NULL, infolog);
-		/* get type of shader for which compilation fails */
-		switch(type) {
-			case GL_VERTEX_SHADER:
-				typename = "GL_VERTEX_SHADER";
-				break;
-			case GL_FRAGMENT_SHADER:
-				typename = "GL_FRAGMENT_SHADER";
-				break;
-			case GL_GEOMETRY_SHADER:
-				typename = "GL_GEOMETRY_SHADER";
-				break;
-			default:
-				typename = "<unknown>";
-		}
-		infolog[il_len-1] = 0;
-		fprintf(stderr, "ERROR: Failed to compile shader of type '%s'! Error log:\n%s\n", typename, infolog);
-	}
+	_gl_chkcmp(s, infolog, il_len);
 
 	return s;
 }
@@ -286,7 +279,7 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 		int gl_il_len;
 		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 		if(gl_il_len > il_len)
-			fprintf(stderr, "ERROR: Unable to get shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+			fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
 		glGetProgramInfoLog(sp, il_len, NULL, infolog);
 		infolog[il_len-1] = 0;
 		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
@@ -378,12 +371,16 @@ int main(void) {
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
+	int time_loc = glGetUniformLocation(sp2, "time");
+	if(time_loc < 0) _die("ERROR: Unable to get uniform location!\n");
+
 	double t0 = glfwGetTime();
 	rotate2darrf(vertices, vrot, 4, ws.time);
 	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(sp2);
+		glUniform1f(time_loc, (float)ws.time);
 		glDrawArrays(GL_POINTS, 0, 3);
 		glUseProgram(sp1);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
