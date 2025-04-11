@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-enum _Sizes { IQSZ_ = 256, LOGSZ_ = 4096, MAXSHADERS_ = 16, MAXFSZ_ = 1 << 24 };
+enum _Sizes { IQSZ_ = 256, LOGSZ_ = 4096, MAXFSZ_ = 1 << 24 };
 
 char g_srcbuf[MAXFSZ_] = {0};
 char g_errlog[LOGSZ_] = {0};
@@ -22,6 +22,7 @@ struct _glfw_inputevent {
 	double time;
 };
 
+/* Queue keyboard and mouse input events to be evaluated  */
 struct _glfw_inputqueue {
 	int start, end;
 	struct _glfw_inputevent queue[IQSZ_];
@@ -44,9 +45,9 @@ struct _glfw_winstate {
 
 	/* Queue of keypresses to evaluate at once */
 	struct _glfw_inputqueue iq;
-
 };
 
+/* Window state - global structure */
 struct _glfw_winstate ws = {
 	.win = NULL,
 	.width = 640, .height = 480,
@@ -65,28 +66,26 @@ struct _glfw_winstate ws = {
 	},
 };
 
+/* Destroy global window - wrapper function for atexit */
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
 }
 
+/* Reset input queue */
 void _iqclear(struct _glfw_inputqueue *q) {
 	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
 	q->start = 0;
 	q->end = 0;
 }
 
+/* Check if input queue is set properly - else print error message and reset  */
 void _iqcheck(struct _glfw_inputqueue *q) {
 	/* Bounds check for queue just in case */
-	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start = %d, end = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
-		_iqclear(q);
-	}
-
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(q->end == q->start + IQSZ_) {
-		fprintf(stderr, "ERROR: Key press queue overflow - clearing queue!\n(start index = %d, max queue size = %d)\n", q->start, IQSZ_);
-		_iqclear(q);
-	}
+	if(! (q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) ) return; 
+
+	fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
+	_iqclear(q);
 }
 
 void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
@@ -126,10 +125,11 @@ void _glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, i
 
 /* Cursor position callback: simply update global mouse coordinates */
 void _glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
-	/* Window remains unused */
-	(void)window;
 	ws.mx = x;
 	ws.my = y;
+
+	/* Window remains unused */
+	(void)window;
 }
 
 /* Mouse click callback: same as key callback */
@@ -141,15 +141,16 @@ void _glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int m
 	(void)window;
 }
 
+/* Callback for framebuffer resize events (i.e window resize events) */
 void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 	ws.width = width;
 	ws.height = height;
 
+	/* Window remains unused */
 	(void)window;
 }
 
 /* Create window - optionally maximize and make it fullscreen */
-/*( unknown what occurs at windowed = 0, fullscreen = 0 ) */
 void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
@@ -230,30 +231,31 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	int success = 0;
 
 	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
-	if(!success) {
-		int gl_il_len;
-		glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len)
-			fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-		glGetShaderInfoLog(s, il_len, NULL, infolog);
-		/* get type of shader for which compilation fails */
-		infolog[il_len-1] = 0;
-		fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
-	}
+	if(success) return;
+
+	int gl_il_len;
+	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
+	if(gl_il_len > il_len)
+		fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+
+	glGetShaderInfoLog(s, il_len, NULL, infolog);
+	infolog[il_len-1] = 0;
+
+	fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
 }
 
 unsigned int _gl_genshader(const char* path, GLenum type, char* srcbuf, int srcbuf_sz, char* infolog, int il_len) {
 	int len = 0;
 	_io_filetobuf(path, &len, srcbuf, srcbuf_sz);
+
 	unsigned int s = glCreateShader(type);
 
 	char *bufloc = srcbuf;
-	glShaderSource(s, 1, (const char**)(&bufloc), NULL);;
-	memset(bufloc, 0, len);
+	glShaderSource(s, 1, (const char* const*)(&bufloc), NULL);;
+	memset(bufloc, 0, len+1);
 
 	glCompileShader(s);
 
-	/* check shader compilation status */
 	_gl_chkcmp(s, infolog, il_len);
 
 	return s;
@@ -263,27 +265,26 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	int success = 0;
 
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
-	if(!success) {
-		int gl_il_len;
-		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-		if(gl_il_len > il_len)
-			fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-		glGetProgramInfoLog(sp, il_len, NULL, infolog);
-		infolog[il_len-1] = 0;
-		fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
-	}
+	if(success) return;
+
+	int gl_il_len;
+	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
+	if(gl_il_len > il_len)
+		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+
+	glGetProgramInfoLog(sp, il_len, NULL, infolog);
+	infolog[il_len-1] = 0;
+
+	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
 void _gl_cleanshaders(unsigned int sp) {
-	int n;
-	unsigned int shaders[MAXSHADERS_];
-
+	int n = 0;
 	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n) {
-		glGetAttachedShaders(sp, MAXSHADERS_, NULL, shaders);
-		for(int i = 0; i < n; ++i) {
-			glDetachShader(sp, shaders[i]);
-			glDeleteShader(shaders[i]);
-		}
+		unsigned int s;
+		glGetAttachedShaders(sp, 1, NULL, &s);
+		glDetachShader(sp, s);
+		glDeleteShader(s);
 	}
 }
 
