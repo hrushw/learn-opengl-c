@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <math.h>
 
 enum _Sizes { IQSZ_ = 256, LOGSZ_ = 4096, MAXFSZ_ = 1 << 24 };
@@ -322,33 +323,40 @@ void rotate2darrf(float *arr, float* out, int len, double time) {
 		rotate2df(&arr[2*i], &out[2*i], time);
 }
 
+unsigned int _gl_genprogram(unsigned int s, ...) {
+	unsigned int sp = glCreateProgram();
+
+	va_list va;
+	va_start(va, s);
+	while(s) {
+		if(!s) break;
+		glAttachShader(sp, s);
+		s = va_arg(va, unsigned int);
+	}
+	va_end(va);
+
+	glLinkProgram(sp);
+	_gl_chklink(sp, g_errlog, LOGSZ_);
+
+	return sp;
+}
+
+#define _gl_GenProgram(...) _gl_genprogram(__VA_ARGS__ __VA_OPT__(,) 0);
+
 /* Main function */
 int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	unsigned int sp1 = glCreateProgram();
-	unsigned int sp2 = glCreateProgram();
-
 	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
 	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
 	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
 
-	glAttachShader(sp1, vert);
-	glAttachShader(sp1, frag);
-
-	glAttachShader(sp2, vert);
-	glAttachShader(sp2, geom);
-	glAttachShader(sp2, frag);
-
-	glLinkProgram(sp1);
-	glLinkProgram(sp2);
+	unsigned int sp1 = _gl_GenProgram(vert, frag);
+	unsigned int sp2 = _gl_GenProgram(vert, geom, frag);
 
 	_gl_cleanshaders(sp1);
 	_gl_cleanshaders(sp2);
-
-	_gl_chklink(sp1, g_errlog, LOGSZ_);
-	_gl_chklink(sp2, g_errlog, LOGSZ_);
 
 	unsigned int VAO, VBO;
 	glGenVertexArrays(1, &VAO);
