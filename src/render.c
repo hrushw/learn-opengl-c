@@ -12,12 +12,8 @@ enum _Sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 24 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
-	int key;
-	int action;
-	int mods;
-	double mx;
-	double my;
-	double time;
+	int key, action, mods;
+	double mx, my, time;
 };
 
 /* Queue keyboard and mouse input events to be evaluated  */
@@ -30,35 +26,24 @@ struct _glfw_winstate {
 	GLFWwindow* win;
 	int width, height;
 	const char* title;
-
 	unsigned int sp;
-
 	/* Mouse x, y position */
 	double mx, my;
-
-	double time;
-	double dt;
-
+	double time, dt;
 	int runstate;
-
 	/* Queue of keypresses to evaluate at once */
 	struct _glfw_inputqueue iq;
 };
-
 
 /* Window state - global structure */
 struct _glfw_winstate ws = {
 	.win = NULL,
 	.width = 640, .height = 480,
 	.title = "Pentagon",
-
 	.sp = 0,
 	.mx = 0, .my = 0,
-
 	.time = 0, .dt = 0,
-
 	.runstate = 1,
-
 	.iq = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
@@ -66,18 +51,15 @@ struct _glfw_winstate ws = {
 };
 char g_charbuf[CHBUFSZ_] = {0};
 
-
 /* Destroy global window - wrapper function for atexit */
 void __glfw_window_destroy(void) {
 	glfwDestroyWindow(ws.win);
 }
 
-
 /* Reset input queue */
 void _iqclear(struct _glfw_inputqueue *q) {
 	memset(q->queue, 0, IQSZ_ * sizeof(struct _glfw_inputevent));
-	q->start = 0;
-	q->end = 0;
+	q->start = 0, q->end = 0;
 }
 
 /* Check if input queue is set properly - else print error message and reset  */
@@ -92,22 +74,13 @@ void _iqcheck(struct _glfw_inputqueue *q) {
 
 void _iqappend(struct _glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
 	_iqcheck(q);
-
 	q->queue[q->end] = (struct _glfw_inputevent) {
-		.key = key,
-		.action = action,
-		.mods = mods,
-
+		.key = key, .action = action, .mods = mods,
 		/* Mouse x,y coordinates and time are not rechecked in key callback function */
-		.mx = mx,
-		.my = my,
-		.time = time
+		.mx = mx, .my = my, .time = time
 	};
-
-	q->end += 1;
-	q->end %= 2*IQSZ_;
+	q->end = (q->end + 1) % 2*IQSZ_;
 }
-
 
 /* Immediately exit on any error encountered by GLFW */
 void _glfw_callback_error(int err, const char* desc) {
@@ -119,17 +92,13 @@ void _glfw_callback_error(int err, const char* desc) {
 /* Additionally store mouse coordinates into queue */
 void _glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
-
 	/* Window and scancode remain unused */
-	(void)window;
-	(void)scancode;
+	(void)window, (void)scancode;
 }
 
 /* Cursor position callback: simply update global mouse coordinates */
 void _glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
-	ws.mx = x;
-	ws.my = y;
-
+	ws.mx = x, ws.my = y;
 	/* Window remains unused */
 	(void)window;
 }
@@ -138,16 +107,13 @@ void _glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void _glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
-
 	/* Window remains unused */
 	(void)window;
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */
 void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
-	ws.width = width;
-	ws.height = height;
-
+	ws.width = width, ws.height = height;
 	/* Window remains unused */
 	(void)window;
 }
@@ -167,8 +133,7 @@ void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
 		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-		wst->width = mode->width;
-		wst->height = mode->height;
+		wst->width = mode->width, wst->height = mode->height;
 	}
 	if(fullscreen && windowed)
 		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
@@ -251,11 +216,9 @@ void _gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 
 /* Generate shader from file path - general function */
 unsigned int _gl_genshader(const char* path, int type, char* charbuf, int charbufsz) {
+	unsigned int s = glCreateShader(type);
 	int len = 0;
 	_io_filetobuf(path, &len, charbuf, charbufsz);
-
-	unsigned int s = glCreateShader(type);
-
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
 	memset(charbuf, 0, len+1);
 
@@ -269,7 +232,6 @@ unsigned int _gl_genshader(const char* path, int type, char* charbuf, int charbu
 /* Check if program was linked successfully */
 void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	int success = 0;
-
 	glGetProgramiv(sp, GL_LINK_STATUS, &success);
 	if(success) return;
 
@@ -277,10 +239,8 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
 		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-
 	glGetProgramInfoLog(sp, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
-
 	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
@@ -299,16 +259,13 @@ void _gl_cleanprogshaders(unsigned int sp) {
 /* Arguments are terminated by 0 */
 unsigned int _gl_genprogram_v(char* infolog, int il_len, va_list args) {
 	unsigned int sp = glCreateProgram();
-
 	unsigned int s = va_arg(args, unsigned int);
 	while(s) {
 		glAttachShader(sp, s);
 		s = va_arg(args, unsigned int);
 	}
-
 	glLinkProgram(sp);
 	_gl_chklink(sp, infolog, il_len);
-
 	return sp;
 }
 
@@ -323,13 +280,10 @@ unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
 }
 
 /* Wrapper macro adding terminating 0 */
-#define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0);
+#define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
 
 
-enum proghandlemethod {
-	PROG_GEN, PROG_DEL,
-	PROG_USE_1, PROG_USE_2
-};
+enum proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE_1, PROG_USE_2 };
 
 void proghandler(enum proghandlemethod method) {
 	static unsigned int vert = 0, geom = 0, frag = 0;
@@ -342,23 +296,16 @@ void proghandler(enum proghandlemethod method) {
 			vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_charbuf, CHBUFSZ_);
 			geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_charbuf, CHBUFSZ_);
 			frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_charbuf, CHBUFSZ_);
-
 			/* Shader Programs */
-			sp1 = _gl_GenProgram(vert, frag);
-			sp2 = _gl_GenProgram(vert, geom, frag);
-
-			_gl_cleanprogshaders(sp1);
-			_gl_cleanprogshaders(sp2);
-
+			sp1 = _gl_GenProgram(vert, frag), sp2 = _gl_GenProgram(vert, geom, frag);
+			_gl_cleanprogshaders(sp1), _gl_cleanprogshaders(sp2);
 			/* Uniform location */
 			time_loc = glGetUniformLocation(sp2, "time");
 			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-
 			break;
 
 		case PROG_DEL:
-			glDeleteProgram(sp1);
-			glDeleteProgram(sp2);
+			glDeleteProgram(sp1), glDeleteProgram(sp2);
 			break;
 
 		case PROG_USE_1:
@@ -368,16 +315,11 @@ void proghandler(enum proghandlemethod method) {
 			glUseProgram(sp2);
 			glUniform1f(time_loc, (float)ws.time);
 			break;
-
-		default:
-			break;
 	}
 }
 
 void updatetime(double *time, double *t0, double *dt) {
-	*time = glfwGetTime();
-	*dt = *time - *t0;
-	*t0 = *time;
+	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
 
 void rotate2df(float pos[2], float out[2], double angle) {
@@ -386,11 +328,10 @@ void rotate2df(float pos[2], float out[2], double angle) {
 }
 
 void rotate2darrf(float *arr, float* out, int len, double time) {
-	for(int i = 0; i < len; ++i)
-		rotate2df(&arr[2*i], &out[2*i], time);
+	for(int i = 0; i < len; ++i) rotate2df(&arr[2*i], &out[2*i], time);
 }
 
-/* Currently only clears the queue and resets indices */
+/* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct _glfw_inputqueue *q) {
 	for(int i = q->start; i != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
@@ -402,12 +343,8 @@ void evalqueue(struct _glfw_inputqueue *q) {
 }
 
 float vertices[] = {
-	 0.0f,  0.5f,
-	-0.2f, -0.1f,
-	 0.4f, -0.2f,
-	-0.6f,  0.8f,
-	 0.5f,  0.0f,
-	-0.8f,  0.2f,
+	 0.0f,  0.5f,   -0.2f, -0.1f,    0.4f, -0.2f,
+	-0.6f,  0.8f,    0.5f,  0.0f,   -0.8f,  0.2f,
 };
 
 /* Main function */
@@ -419,18 +356,14 @@ int main(void) {
 
 	/* Vertex buffer object */
 	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glGenBuffers(1, &VBO), glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
 	/* Vertex Array Object */
 	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-	glEnableVertexAttribArray(0);
+	glGenVertexArrays(1, &VAO), glBindVertexArray(VAO);
 
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-
+	glEnableVertexAttribArray(0), glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
 	/* Map array buffer to memory */
 	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
@@ -443,12 +376,10 @@ int main(void) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		/* Use program 2 - with geometry shader (pentagons) */
-		proghandler(PROG_USE_2);
-		glDrawArrays(GL_POINTS, 0, 6);
+		proghandler(PROG_USE_2), glDrawArrays(GL_POINTS, 0, 6);
 
 		/* Use program 1 - without geometry shader (triangles) */
-		proghandler(PROG_USE_1);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		proghandler(PROG_USE_1), glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
 		glfwSwapBuffers(ws.win);
@@ -462,9 +393,7 @@ int main(void) {
 
 	/* Cleanup */
 	proghandler(PROG_DEL);
-
 	glUnmapBuffer(GL_ARRAY_BUFFER);
-
 	glDeleteBuffers(1, &VBO);
 	glDeleteVertexArrays(1, &VAO);
 
