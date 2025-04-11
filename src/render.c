@@ -358,22 +358,60 @@ void rotate2darrf(float *arr, float* out, int len, double time) {
 		rotate2df(&arr[2*i], &out[2*i], time);
 }
 
+enum proghandlemethod {
+	PROG_GEN, PROG_DEL,
+	PROG_USE_1, PROG_USE_2
+};
+
+void proghandler(enum proghandlemethod method) {
+	static unsigned int vert = 0, geom = 0, frag = 0;
+	static unsigned int sp1 = 0, sp2 = 0;
+	static int time_loc = -1;
+
+	switch(method) {
+		case PROG_GEN:
+			/* Shaders */
+			vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_charbuf, CHBUFSZ_);
+			geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_charbuf, CHBUFSZ_);
+			frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_charbuf, CHBUFSZ_);
+
+			/* Shader Programs */
+			sp1 = _gl_GenProgram(vert, frag);
+			sp2 = _gl_GenProgram(vert, geom, frag);
+
+			_gl_cleanprogshaders(sp1);
+			_gl_cleanprogshaders(sp2);
+
+			/* Uniform location */
+			time_loc = glGetUniformLocation(sp2, "time");
+			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+
+			break;
+
+		case PROG_DEL:
+			glDeleteProgram(sp1);
+			glDeleteProgram(sp2);
+			break;
+
+		case PROG_USE_1:
+			glUseProgram(sp1);
+			break;
+		case PROG_USE_2:
+			glUseProgram(sp2);
+			glUniform1f(time_loc, (float)ws.time);
+			break;
+
+		default:
+			break;
+	}
+}
+
 /* Main function */
 int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	/* Shaders */
-	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_charbuf, CHBUFSZ_);
-	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_charbuf, CHBUFSZ_);
-	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_charbuf, CHBUFSZ_);
-
-	/* Shader Programs */
-	unsigned int sp1 = _gl_GenProgram(vert, frag);
-	unsigned int sp2 = _gl_GenProgram(vert, geom, frag);
-
-	_gl_cleanprogshaders(sp1);
-	_gl_cleanprogshaders(sp2);
+	proghandler(PROG_GEN);
 
 	/* Vertex buffer object */
 	unsigned int VBO;
@@ -389,9 +427,6 @@ int main(void) {
 
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
-	/* Uniform location */
-	int time_loc = glGetUniformLocation(sp2, "time");
-	if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
 
 	/* Map array buffer to memory */
 	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
@@ -404,12 +439,11 @@ int main(void) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		/* Use program 2 - with geometry shader (pentagons) */
-		glUseProgram(sp2);
-		glUniform1f(time_loc, (float)ws.time);
+		proghandler(PROG_USE_2);
 		glDrawArrays(GL_POINTS, 0, 6);
 
 		/* Use program 1 - without geometry shader (triangles) */
-		glUseProgram(sp1);
+		proghandler(PROG_USE_1);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
@@ -423,8 +457,7 @@ int main(void) {
 	}
 
 	/* Cleanup */
-	glDeleteProgram(sp1);
-	glDeleteProgram(sp2);
+	proghandler(PROG_DEL);
 
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 
