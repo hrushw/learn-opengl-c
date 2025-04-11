@@ -288,21 +288,6 @@ void _gl_cleanshaders(unsigned int sp) {
 	}
 }
 
-/* Generate the shader program */
-unsigned int genProgram(int arg) {
-	unsigned int sp = glCreateProgram();
-
-	/* generate vertex and fragment shader */
-	glAttachShader(sp, _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
-	if(arg) glAttachShader(sp, _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
-	glAttachShader(sp, _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_));
-
-	glLinkProgram(sp);
-	_gl_cleanshaders(sp);
-	_gl_chklink(sp, g_errlog, LOGSZ_);
-	return sp;
-}
-
 void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime();
 	*dt = *time - *t0;
@@ -333,9 +318,8 @@ float vertices[] = {
 };
 
 void rotate2darrf(float *arr, float* out, int len, double time) {
-	for(int i = 0; i < len; ++i) {
+	for(int i = 0; i < len; ++i)
 		rotate2df(&arr[2*i], &out[2*i], time);
-	}
 }
 
 /* Main function */
@@ -343,8 +327,28 @@ int main(void) {
 	_glfw_initialize(&ws);
 	gladLoadGL(glfwGetProcAddress);
 
-	unsigned int sp1 = genProgram(0);
-	unsigned int sp2 = genProgram(1);
+	unsigned int sp1 = glCreateProgram();
+	unsigned int sp2 = glCreateProgram();
+
+	unsigned int vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
+	unsigned int geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
+	unsigned int frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_srcbuf, MAXFSZ_, g_errlog, LOGSZ_);
+
+	glAttachShader(sp1, vert);
+	glAttachShader(sp1, frag);
+
+	glAttachShader(sp2, vert);
+	glAttachShader(sp2, geom);
+	glAttachShader(sp2, frag);
+
+	glLinkProgram(sp1);
+	glLinkProgram(sp2);
+
+	_gl_cleanshaders(sp1);
+	_gl_cleanshaders(sp2);
+
+	_gl_chklink(sp1, g_errlog, LOGSZ_);
+	_gl_chklink(sp2, g_errlog, LOGSZ_);
 
 	unsigned int VAO, VBO;
 	glGenVertexArrays(1, &VAO);
