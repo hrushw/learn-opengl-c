@@ -373,7 +373,8 @@ int main(void) {
 
 	/* Initialize time and loop */
 	double t0 = glfwGetTime(), dt = 0;
-	while(!glfwWindowShouldClose(glfwGetCurrentContext()) && ws.runstate) {
+	void* win = glfwGetCurrentContext();
+	while(!glfwWindowShouldClose(win) && ws.runstate) {
 		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -387,7 +388,7 @@ int main(void) {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
-		glfwSwapBuffers(glfwGetCurrentContext());
+		glfwSwapBuffers(win);
 		glfwPollEvents();
 
 		/* Other computations */
