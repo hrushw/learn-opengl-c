@@ -23,10 +23,7 @@ struct _glfw_inputqueue {
 };
 
 struct _glfw_winstate {
-	GLFWwindow* win;
 	int width, height;
-	const char* title;
-	unsigned int sp;
 	/* Mouse x, y position */
 	double mx, my;
 	double time, dt;
@@ -37,10 +34,7 @@ struct _glfw_winstate {
 
 /* Window state - global structure */
 struct _glfw_winstate ws = {
-	.win = NULL,
 	.width = 640, .height = 480,
-	.title = "Pentagon",
-	.sp = 0,
 	.mx = 0, .my = 0,
 	.time = 0, .dt = 0,
 	.runstate = 1,
@@ -51,8 +45,10 @@ struct _glfw_winstate ws = {
 };
 char g_charbuf[CHBUFSZ_] = {0};
 
-/* Destroy global window - wrapper function for atexit */
-void __glfw_window_destroy(void) { glfwDestroyWindow(ws.win); }
+/* Destroy window - wrapper function for atexit */
+void __glfw_window_destroy(void) {
+	glfwDestroyWindow(glfwGetCurrentContext());
+}
 
 /* Reset input queue */
 void _iqclear(struct _glfw_inputqueue *q) {
@@ -116,32 +112,39 @@ void _glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 	(void)window;
 }
 
+enum wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
 
 /* Create window - optionally maximize and make it fullscreen */
-void _glfw_crwin(struct _glfw_winstate *wst, int fullscreen, int windowed) {
+GLFWwindow* _glfw_crwin(struct _glfw_winstate *wst, const char* title, enum wintype type) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
 
 	const GLFWvidmode* mode = glfwGetVideoMode(mon);
 	if(!mode) exit(EXIT_FAILURE);
 
-	if(fullscreen && !windowed) {
-		glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-		glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-
-		wst->width = mode->width, wst->height = mode->height;
+	switch(type) {
+		case WIN_FSCR:
+			glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+			glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+			glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+			glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+			wst->width = mode->width, wst->height = mode->height;
+			break;
+		case WIN_MAX:
+			glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+			// fall through
+		case WIN_DEF:
+		default:
+			mon = NULL;
 	}
-	if(fullscreen && windowed) glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-	if(windowed) mon = NULL;
 
-	wst->win = glfwCreateWindow(wst->width, wst->height, wst->title, mon, NULL);
-	if(!wst->win) exit(EXIT_FAILURE);
+	GLFWwindow* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
+	if(!win) exit(EXIT_FAILURE);
+	return win;
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-void _glfw_initialize(struct _glfw_winstate *wst) {
+void _glfw_initialize(struct _glfw_winstate *wst, const char* title) {
 	glfwSetErrorCallback(_glfw_callback_error);
 	glfwInit();
 
@@ -155,15 +158,15 @@ void _glfw_initialize(struct _glfw_winstate *wst) {
 
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
 
-	_glfw_crwin(wst, 0, 1);
+	GLFWwindow* win = _glfw_crwin(wst, title, WIN_DEF);
 	atexit(__glfw_window_destroy);
 
-	glfwSetKeyCallback(wst->win, _glfw_callback_key);
-	glfwSetCursorPosCallback(wst->win, _glfw_callback_cursorpos);
-	glfwSetMouseButtonCallback(wst->win, _glfw_callback_mouseclick);
-	glfwSetFramebufferSizeCallback(wst->win, _glfw_callback_fbresize);
+	glfwSetKeyCallback(win, _glfw_callback_key);
+	glfwSetCursorPosCallback(win, _glfw_callback_cursorpos);
+	glfwSetMouseButtonCallback(win, _glfw_callback_mouseclick);
+	glfwSetFramebufferSizeCallback(win, _glfw_callback_fbresize);
 
-	glfwMakeContextCurrent(wst->win);
+	glfwMakeContextCurrent(win);
 	glfwSwapInterval(1);
 }
 
@@ -271,6 +274,7 @@ unsigned int _gl_genprogram(char* infolog, int il_len, ...) {
 
 /* Wrapper macro adding terminating 0 */
 #define _gl_GenProgram(...) _gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
+#define _gl_GenShader(path, type) _gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 
 void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
@@ -285,10 +289,11 @@ void proghandler(enum proghandlemethod method) {
 
 	switch(method) {
 		case PROG_GEN:
+			glDeleteProgram(sp1), glDeleteProgram(sp2);
 			/* Shaders */
-			vert = _gl_genshader("vertex.glsl", GL_VERTEX_SHADER, g_charbuf, CHBUFSZ_);
-			geom = _gl_genshader("geom.glsl", GL_GEOMETRY_SHADER, g_charbuf, CHBUFSZ_);
-			frag = _gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, g_charbuf, CHBUFSZ_);
+			vert = _gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
+			geom = _gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
+			frag = _gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
 			/* Shader Programs */
 			sp1 = _gl_GenProgram(vert, frag), sp2 = _gl_GenProgram(vert, geom, frag);
 			_gl_cleanprogshaders(sp1), _gl_cleanprogshaders(sp2);
@@ -339,7 +344,7 @@ float vertices[] = {
 
 /* Main function */
 int main(void) {
-	_glfw_initialize(&ws);
+	_glfw_initialize(&ws, "Hexagon");
 	gladLoadGL(glfwGetProcAddress);
 
 	proghandler(PROG_GEN);
@@ -360,7 +365,7 @@ int main(void) {
 
 	/* Initialize time and loop */
 	double t0 = glfwGetTime();
-	while(!glfwWindowShouldClose(ws.win) && ws.runstate) {
+	while(!glfwWindowShouldClose(glfwGetCurrentContext()) && ws.runstate) {
 		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -372,7 +377,7 @@ int main(void) {
 		proghandler(PROG_USE_1), glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
-		glfwSwapBuffers(ws.win);
+		glfwSwapBuffers(glfwGetCurrentContext());
 		glfwPollEvents();
 
 		/* Other computations */
@@ -382,6 +387,7 @@ int main(void) {
 	}
 
 	/* Cleanup */
+	/* */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
