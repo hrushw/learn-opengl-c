@@ -113,6 +113,12 @@ void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
 	(void)window;
 }
 
+/* Callback for window close event */
+void f_glfw_callback_winclose(GLFWwindow *window) {
+	ws.runstate = 0;
+	(void)window;
+}
+
 enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
 
 /* Create window - optionally maximize and make it fullscreen */
@@ -166,6 +172,7 @@ void f_glfw_initialize(struct t_glfw_winstate *wst, const char* title) {
 	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
 	glfwSetMouseButtonCallback(win, f_glfw_callback_mouseclick);
 	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
+	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
 	glfwMakeContextCurrent(win);
 	glfwSwapInterval(1);
@@ -174,7 +181,7 @@ void f_glfw_initialize(struct t_glfw_winstate *wst, const char* title) {
 
 /* Read file into buffer */
 /* No longer causes program exit on failure */
-void _io_filetobuf(const char* path, int* len, char* buf, int buflen) {
+void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* f = fopen(path, "rb");
 	long l;
 	if(!f) {
@@ -215,7 +222,7 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charbufsz) {
 	unsigned int s = glCreateShader(type);
 	int len = 0;
-	_io_filetobuf(path, &len, charbuf, charbufsz);
+	f_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
 	memset(charbuf, 0, len+1);
 	glCompileShader(s);
@@ -273,8 +280,8 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, ...) {
 }
 
 /* Wrapper macro adding terminating 0 */
-#define f_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
-#define f_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
+#define F_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
+#define F_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 
 void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
@@ -307,12 +314,12 @@ void proghandler(enum e_proghandlemethod method) {
 		create:
 		case PROG_CR:
 			/* Shaders */
-			vert = f_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
-			geom = f_gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
-			frag = f_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
+			vert = F_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
+			geom = F_gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
+			frag = F_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
 			/* Shader Programs */
-			sp1 = f_gl_GenProgram(vert, frag);
-			sp2 = f_gl_GenProgram(vert, geom, frag);
+			sp1 = F_gl_GenProgram(vert, frag);
+			sp2 = F_gl_GenProgram(vert, geom, frag);
 
 			f_gl_detachprogshaders(sp1);
 			f_gl_detachprogshaders(sp2);
@@ -374,7 +381,7 @@ int main(void) {
 	/* Initialize time and loop */
 	double t0 = glfwGetTime(), dt = 0;
 	void* win = glfwGetCurrentContext();
-	while(!glfwWindowShouldClose(win) && ws.runstate) {
+	while(ws.runstate) {
 		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
