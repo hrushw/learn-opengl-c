@@ -280,7 +280,7 @@ void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
 
-enum proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE_1, PROG_USE_2 };
+enum proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE_1, PROG_USE_2 };
 
 void proghandler(enum proghandlemethod method) {
 	static unsigned int vert = 0, geom = 0, frag = 0;
@@ -289,22 +289,11 @@ void proghandler(enum proghandlemethod method) {
 
 	switch(method) {
 		case PROG_GEN:
-			glDeleteProgram(sp1), glDeleteProgram(sp2);
-			/* Shaders */
-			vert = _gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
-			geom = _gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
-			frag = _gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
-			/* Shader Programs */
-			sp1 = _gl_GenProgram(vert, frag), sp2 = _gl_GenProgram(vert, geom, frag);
-			_gl_cleanprogshaders(sp1), _gl_cleanprogshaders(sp2);
-			/* Uniform location */
-			time_loc = glGetUniformLocation(sp2, "time");
-			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-			break;
-
+			method = PROG_CR;
+			// fall through
 		case PROG_DEL:
 			glDeleteProgram(sp1), glDeleteProgram(sp2);
-			break;
+			goto create;
 
 		case PROG_USE_1:
 			glUseProgram(sp1); break;
@@ -313,6 +302,22 @@ void proghandler(enum proghandlemethod method) {
 			glUseProgram(sp2);
 			glUniform1f(time_loc, (float)ws.time);
 			break;
+
+		create:
+		case PROG_CR:
+			/* Shaders */
+			vert = _gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
+			geom = _gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
+			frag = _gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
+			/* Shader Programs */
+			sp1 = _gl_GenProgram(vert, frag);
+			sp2 = _gl_GenProgram(vert, geom, frag);
+
+			_gl_cleanprogshaders(sp1);
+			_gl_cleanprogshaders(sp2);
+			/* Uniform location */
+			time_loc = glGetUniformLocation(sp2, "time");
+			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
 	}
 }
 
