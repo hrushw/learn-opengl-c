@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include <math.h>
 
-enum _Sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 24 };
+enum _Sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 20 };
 
 /* Keypress struct - don't care about scancode or window */
 struct _glfw_inputevent {
@@ -60,7 +60,8 @@ void _iqclear(struct _glfw_inputqueue *q) {
 void _iqcheck(struct _glfw_inputqueue *q) {
 	/* Bounds check for queue just in case */
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(! (q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) ) return; 
+	if(! (q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) )
+		return; 
 
 	fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
 	_iqclear(q);
@@ -238,13 +239,12 @@ void _gl_chklink(unsigned int sp, char *infolog, int il_len) {
 }
 
 /* Get all shaders attached to a program, detach them and delete them */
-void _gl_cleanprogshaders(unsigned int sp) {
+void _gl_detachprogshaders(unsigned int sp) {
 	int n = 0;
 	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n) {
 		unsigned int s;
 		glGetAttachedShaders(sp, 1, NULL, &s);
 		glDetachShader(sp, s);
-		glDeleteShader(s);
 	}
 }
 
@@ -293,6 +293,7 @@ void proghandler(enum proghandlemethod method) {
 			// fall through
 		case PROG_DEL:
 			glDeleteProgram(sp1), glDeleteProgram(sp2);
+			glDeleteShader(vert), glDeleteShader(geom), glDeleteShader(frag);
 			goto create;
 
 		case PROG_USE_1:
@@ -313,8 +314,8 @@ void proghandler(enum proghandlemethod method) {
 			sp1 = _gl_GenProgram(vert, frag);
 			sp2 = _gl_GenProgram(vert, geom, frag);
 
-			_gl_cleanprogshaders(sp1);
-			_gl_cleanprogshaders(sp2);
+			_gl_detachprogshaders(sp1);
+			_gl_detachprogshaders(sp2);
 			/* Uniform location */
 			time_loc = glGetUniformLocation(sp2, "time");
 			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
@@ -356,31 +357,34 @@ int main(void) {
 
 	/* Vertex buffer object */
 	unsigned int VBO;
-	glGenBuffers(1, &VBO), glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
 	/* Vertex Array Object */
 	unsigned int VAO;
-	glGenVertexArrays(1, &VAO), glBindVertexArray(VAO);
-
-	glEnableVertexAttribArray(0), glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
 	/* Map array buffer to memory */
 	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 
 	/* Initialize time and loop */
-	double t0 = glfwGetTime();
-	double dt = 0;
+	double t0 = glfwGetTime(), dt = 0;
 	while(!glfwWindowShouldClose(glfwGetCurrentContext()) && ws.runstate) {
 		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		/* Use program 2 - with geometry shader (pentagons) */
-		proghandler(PROG_USE_2), glDrawArrays(GL_POINTS, 0, 6);
+		proghandler(PROG_USE_2);
+		glDrawArrays(GL_POINTS, 0, 6);
 
 		/* Use program 1 - without geometry shader (triangles) */
-		proghandler(PROG_USE_1), glDrawArrays(GL_TRIANGLES, 0, 6);
+		proghandler(PROG_USE_1);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* GLFW window handling */
 		glfwSwapBuffers(glfwGetCurrentContext());
@@ -393,7 +397,6 @@ int main(void) {
 	}
 
 	/* Cleanup */
-	/* */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
