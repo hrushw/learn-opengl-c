@@ -26,7 +26,7 @@ struct _glfw_winstate {
 	int width, height;
 	/* Mouse x, y position */
 	double mx, my;
-	double time, dt;
+	double time;
 	int runstate;
 	/* Queue of keypresses to evaluate at once */
 	struct _glfw_inputqueue iq;
@@ -36,7 +36,7 @@ struct _glfw_winstate {
 struct _glfw_winstate ws = {
 	.width = 640, .height = 480,
 	.mx = 0, .my = 0,
-	.time = 0, .dt = 0,
+	.time = 0,
 	.runstate = 1,
 	.iq = {
 		.start = 0, .end = 0,
@@ -365,6 +365,7 @@ int main(void) {
 
 	/* Initialize time and loop */
 	double t0 = glfwGetTime();
+	double dt = 0;
 	while(!glfwWindowShouldClose(glfwGetCurrentContext()) && ws.runstate) {
 		/* Set viewport and clear screen before drawing */
 		glViewport(0, 0, ws.width, ws.height);
@@ -381,7 +382,7 @@ int main(void) {
 		glfwPollEvents();
 
 		/* Other computations */
-		updatetime(&ws.time, &t0, &ws.dt);
+		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
 		rotate2darrf(vertices, vrot, 6, ws.time);
 	}
