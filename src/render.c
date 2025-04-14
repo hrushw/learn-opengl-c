@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include <math.h>
 
-enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 20 };
+enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 30 };
 
 /* Keypress struct - don't care about scancode or window */
 struct t_glfw_inputevent {
@@ -27,9 +27,10 @@ struct t_glfw_winstate {
 	/* Mouse x, y position */
 	double mx, my;
 	double time;
-	int runstate;
 	/* Queue of keypresses to evaluate at once */
 	struct t_glfw_inputqueue iq;
+	int szrefresh;
+	int runstate;
 };
 
 /* Window state - global structure */
@@ -37,6 +38,7 @@ struct t_glfw_winstate ws = {
 	.width = 640, .height = 480,
 	.mx = 0, .my = 0,
 	.time = 0,
+	.szrefresh = 1,
 	.runstate = 1,
 	.iq = {
 		.start = 0, .end = 0,
@@ -52,6 +54,7 @@ void f__glfw_window_destroy(void) {
 
 /* Reset input queue */
 void f_iqclear(struct t_glfw_inputqueue *q) {
+	if(!(q->start || q->end)) return;
 	memset(q->queue, 0, IQSZ_ * sizeof(struct t_glfw_inputevent));
 	q->start = 0, q->end = 0;
 }
@@ -108,7 +111,7 @@ void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int 
 
 /* Callback for framebuffer resize events (i.e window resize events) */
 void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
-	ws.width = width, ws.height = height;
+	ws.width = width, ws.height = height, ws.szrefresh = 1;
 	/* Window remains unused */
 	(void)window;
 }
@@ -122,7 +125,7 @@ void f_glfw_callback_winclose(GLFWwindow *window) {
 enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
 
 /* Create window - optionally maximize and make it fullscreen */
-GLFWwindow* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
+void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) exit(EXIT_FAILURE);
 
@@ -145,7 +148,7 @@ GLFWwindow* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_
 			mon = NULL;
 	}
 
-	GLFWwindow* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
+	void* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
 	if(!win) exit(EXIT_FAILURE);
 	return win;
 }
@@ -165,7 +168,7 @@ void f_glfw_initialize(struct t_glfw_winstate *wst, const char* title) {
 
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
 
-	GLFWwindow* win = f_glfw_crwin(wst, title, WIN_DEF);
+	void* win = f_glfw_crwin(wst, title, WIN_DEF);
 	atexit(f__glfw_window_destroy);
 
 	glfwSetKeyCallback(win, f_glfw_callback_key);
@@ -224,7 +227,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charb
 	int len = 0;
 	f_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
-	memset(charbuf, 0, len+1);
+	memset(charbuf, 0, len + 1);
 	glCompileShader(s);
 	f_gl_chkcmp(s, charbuf, charbufsz);
 	return s;
@@ -259,11 +262,8 @@ void f_gl_detachprogshaders(unsigned int sp) {
 /* Arguments are terminated by 0 */
 unsigned int f_gl_genprogram_v(char* infolog, int il_len, va_list args) {
 	unsigned int sp = glCreateProgram();
-	unsigned int s = va_arg(args, unsigned int);
-	while(s) {
+	for(unsigned int s; (s = va_arg(args, unsigned int)); )
 		glAttachShader(sp, s);
-		s = va_arg(args, unsigned int);
-	}
 	glLinkProgram(sp);
 	f_gl_chklink(sp, infolog, il_len);
 	return sp;
@@ -290,9 +290,9 @@ void updatetime(double *time, double *t0, double *dt) {
 enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
 
 void proghandler(enum e_proghandlemethod method) {
+	static unsigned int sp = 0;
 	static unsigned int vert = 0;
 	static unsigned int frag = 0;
-	static unsigned int sp = 0;
 
 	switch(method) {
 		case PROG_GEN:
@@ -368,6 +368,11 @@ unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
+void f_gl_centerfitviewport(int width, int height) {
+	int pad = ws.width > ws.height ? (ws.width - ws.height) / 2 : (ws.height - ws.width) / 2;
+	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
+}
+
 /* Main function */
 int main(void) {
 	f_glfw_initialize(&ws, "Tetrahedron");
@@ -391,10 +396,6 @@ int main(void) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_1D, texobj);
-
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
 
@@ -412,9 +413,7 @@ int main(void) {
 	void* win = glfwGetCurrentContext();
 	while(ws.runstate) {
 		/* Set viewport and clear screen before drawing */
-		int len = ws.width > ws.height ? ws.height : ws.width;
-		int pad = ( (ws.width > ws.height ? ws.width : ws.height) - len ) / 2;
-		len == ws.width ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
+		if(ws.szrefresh) f_gl_centerfitviewport(ws.width, ws.height);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
@@ -436,7 +435,6 @@ int main(void) {
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
-	glDeleteTextures(1, &texobj);
 	glDeleteVertexArrays(1, &VAO);
 
 	exit(EXIT_SUCCESS);
