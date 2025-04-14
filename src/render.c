@@ -413,7 +413,7 @@ int main(void) {
 	void* win = glfwGetCurrentContext();
 	while(ws.runstate) {
 		/* Set viewport and clear screen before drawing */
-		if(ws.szrefresh) f_gl_centerfitviewport(ws.width, ws.height);
+		if(ws.szrefresh) f_gl_centerfitviewport(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
