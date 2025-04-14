@@ -74,7 +74,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 		/* Mouse x,y coordinates and time are not rechecked in key callback function */
 		.mx = mx, .my = my, .time = time
 	};
-	q->end = (q->end + 1) % 2*IQSZ_;
+	q->end = (q->end + 1) % (2*IQSZ_);
 }
 
 /* Immediately exit on any error encountered by GLFW */
@@ -287,45 +287,34 @@ void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
 
-enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE_1, PROG_USE_2 };
+enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
 
 void proghandler(enum e_proghandlemethod method) {
 	static unsigned int vert = 0, geom = 0, frag = 0;
-	static unsigned int sp1 = 0, sp2 = 0;
-	static int time_loc = -1;
+	static unsigned int sp = 0;
 
 	switch(method) {
 		case PROG_GEN:
 			method = PROG_CR;
 			// fall through
 		case PROG_DEL:
-			glDeleteProgram(sp1), glDeleteProgram(sp2);
+			glDeleteProgram(sp);
 			glDeleteShader(vert), glDeleteShader(geom), glDeleteShader(frag);
 			goto create;
 
-		case PROG_USE_1:
-			glUseProgram(sp1); break;
-
-		case PROG_USE_2:
-			glUseProgram(sp2);
-			glUniform1f(time_loc, (float)ws.time);
+		case PROG_USE:
+			glUseProgram(sp);
 			break;
 
 		create:
 		case PROG_CR:
 			/* Shaders */
 			vert = F_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
-			geom = F_gl_GenShader("geom.glsl", GL_GEOMETRY_SHADER);
 			frag = F_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
 			/* Shader Programs */
-			sp1 = F_gl_GenProgram(vert, frag);
-			sp2 = F_gl_GenProgram(vert, geom, frag);
+			sp = F_gl_GenProgram(vert, frag);
 
-			f_gl_detachprogshaders(sp1);
-			f_gl_detachprogshaders(sp2);
-			/* Uniform location */
-			time_loc = glGetUniformLocation(sp2, "time");
-			if(time_loc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+			f_gl_detachprogshaders(sp);
 	}
 }
 
@@ -340,19 +329,40 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	f_iqclear(q);
 }
 
-void rotate2df(float pos[2], float out[2], double angle) {
+void rotate3dfx(float pos[3], float out[3], double angle) {
+	out[0] = pos[0];
+	out[1] = pos[1]*cos(angle) + pos[2]*sin(angle);
+	out[2] = -pos[1]*sin(angle) + pos[2]*cos(angle);
+}
+
+void rotate3dfy(float pos[3], float out[3], double angle) {
+	out[1] = pos[1];
+	out[2] = pos[2]*cos(angle) + pos[0]*sin(angle);
+	out[0] = -pos[2]*sin(angle) + pos[0]*cos(angle);
+}
+
+void rotate3dfz(float pos[3], float out[3], double angle) {
+	out[2] = pos[2];
 	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
 	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
 }
 
-void rotate2darrf(float *arr, float* out, int len, double time) {
-	for(int i = 0; i < len; ++i) rotate2df(&arr[2*i], &out[2*i], time);
+void rotate3df(float pos[3], float out[3], double ax, double ay, double az) {
+	float tmp[3];
+	rotate3dfx(pos, out, ax);
+	rotate3dfy(out, tmp, ay);
+	rotate3dfz(tmp, out, az);
 }
 
-
 float vertices[] = {
-	 0.0f,  0.5f,   -0.2f, -0.1f,    0.4f, -0.2f,
-	-0.6f,  0.8f,    0.5f,  0.0f,   -0.8f,  0.2f,
+	 0.0f,  0.8f,  0.0f,    0.2f, 0.2f, 0.2f,
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,
+};
+
+unsigned int indices[] = {
+	0, 1, 2, 3, 0, 1
 };
 
 /* Main function */
@@ -362,18 +372,30 @@ int main(void) {
 
 	proghandler(PROG_GEN);
 
+	/* Vertex Array Object */
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
 	/* Vertex buffer object */
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
-	/* Vertex Array Object */
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
+
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 
 	/* Map array buffer to memory */
 	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
@@ -383,16 +405,14 @@ int main(void) {
 	void* win = glfwGetCurrentContext();
 	while(ws.runstate) {
 		/* Set viewport and clear screen before drawing */
-		glViewport(0, 0, ws.width, ws.height);
+		int len = ws.width > ws.height ? ws.height : ws.width;
+		int pad = ( (ws.width > ws.height ? ws.width : ws.height) - len ) / 2;
+		len == ws.width ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		/* Use program 2 - with geometry shader (pentagons) */
-		proghandler(PROG_USE_2);
-		glDrawArrays(GL_POINTS, 0, 6);
-
-		/* Use program 1 - without geometry shader (triangles) */
-		proghandler(PROG_USE_1);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		/* Use program */
+		proghandler(PROG_USE);
+		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
 		glfwSwapBuffers(win);
@@ -401,13 +421,16 @@ int main(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
-		rotate2darrf(vertices, vrot, 6, ws.time);
+		for(int i = 0; i < 6; ++i) {
+			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.5*ws.time, 0);
+		}
 	}
 
 	/* Cleanup */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
 
 	exit(EXIT_SUCCESS);
