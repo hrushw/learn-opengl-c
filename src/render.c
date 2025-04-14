@@ -290,7 +290,8 @@ void updatetime(double *time, double *t0, double *dt) {
 enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
 
 void proghandler(enum e_proghandlemethod method) {
-	static unsigned int vert = 0, geom = 0, frag = 0;
+	static unsigned int vert = 0;
+	static unsigned int frag = 0;
 	static unsigned int sp = 0;
 
 	switch(method) {
@@ -299,22 +300,24 @@ void proghandler(enum e_proghandlemethod method) {
 			// fall through
 		case PROG_DEL:
 			glDeleteProgram(sp);
-			glDeleteShader(vert), glDeleteShader(geom), glDeleteShader(frag);
+			glDeleteShader(vert), glDeleteShader(frag);
 			goto create;
-
-		case PROG_USE:
-			glUseProgram(sp);
-			break;
 
 		create:
 		case PROG_CR:
 			/* Shaders */
 			vert = F_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
 			frag = F_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
+
 			/* Shader Programs */
 			sp = F_gl_GenProgram(vert, frag);
 
 			f_gl_detachprogshaders(sp);
+			// fall through
+		case PROG_USE:
+			glUseProgram(sp);
+			break;
+
 	}
 }
 
@@ -367,7 +370,7 @@ unsigned int indices[] = {
 
 /* Main function */
 int main(void) {
-	f_glfw_initialize(&ws, "Hexagon");
+	f_glfw_initialize(&ws, "Tetrahedron");
 	gladLoadGL(glfwGetProcAddress);
 
 	proghandler(PROG_GEN);
@@ -387,6 +390,10 @@ int main(void) {
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_1D, texobj);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
@@ -410,8 +417,6 @@ int main(void) {
 		len == ws.width ? glViewport(0, pad, len, len) : glViewport(pad, 0, len, len);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		/* Use program */
-		proghandler(PROG_USE);
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
@@ -431,6 +436,7 @@ int main(void) {
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
+	glDeleteTextures(1, &texobj);
 	glDeleteVertexArrays(1, &VAO);
 
 	exit(EXIT_SUCCESS);
