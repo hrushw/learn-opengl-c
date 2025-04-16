@@ -46,14 +46,7 @@ struct t_glfw_winstate ws = {
 char g_charbuf[CHBUFSZ_] = {0};
 
 void memclr(void* buf, char c, int n) {
-	for(int i = 0; i < n; ++i) ((char*)buf)[i] = c;
-}
-
-/* Reset input queue */
-void f_iqclear(struct t_glfw_inputqueue *q) {
-	if(!(q->start || q->end)) return;
-	memclr(q->queue, 0, IQSZ_ * sizeof(struct t_glfw_inputevent));
-	q->start = 0, q->end = 0;
+	for(; n >= 0; --n) ((char*)buf)[n] = c;
 }
 
 /* Check if input queue is set properly - else print error message and reset  */
@@ -63,8 +56,9 @@ void f_iqcheck(struct t_glfw_inputqueue *q) {
 	if(! (q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) )
 		return; 
 
+	/* If bounds check fails, log error and reset the queue */
 	fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
-	f_iqclear(q);
+	q->start = 0, q->end = 0;
 }
 
 void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
@@ -77,102 +71,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 	q->end = (q->end + 1) % (2*IQSZ_);
 }
 
-/* Immediately exit on any error encountered by GLFW */
-void f_glfw_callback_error(int err, const char* desc) {
-	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
-}
-
-/* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
-/* Additionally store mouse coordinates into queue */
-void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
-	f_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
-	/* Window and scancode remain unused */
-	(void)window, (void)scancode;
-}
-
-/* Cursor position callback: simply update global mouse coordinates */
-void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
-	ws.mx = x, ws.my = y;
-	/* Window remains unused */
-	(void)window;
-}
-
-/* Mouse click callback: same as key callback */
-/* (this assumes mouse clicks and keypresses have distinct keycodes) */
-void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
-	f_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
-	/* Window remains unused */
-	(void)window;
-}
-
-/* Callback for framebuffer resize events (i.e window resize events) */
-void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
-	ws.width = width, ws.height = height, ws.szrefresh = 1;
-	/* Window remains unused */
-	(void)window;
-}
-
-/* Callback for window close event */
-void f_glfw_callback_winclose(GLFWwindow *window) {
-	ws.runstate = 0;
-	(void)window;
-}
-
 enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
-
-/* Create window - optionally maximize and make it fullscreen */
-void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
-	GLFWmonitor* mon = glfwGetPrimaryMonitor();
-	if(!mon) return NULL;
-
-	const GLFWvidmode* mode = glfwGetVideoMode(mon);
-	if(!mode) return NULL;
-
-	switch(type) {
-		case WIN_FSCR:
-			glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-			glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-			glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-			glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-			wst->width = mode->width, wst->height = mode->height;
-			break;
-		case WIN_MAX:
-			glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-			// fall through
-		case WIN_DEF:
-		default:
-			mon = NULL;
-	}
-
-	void* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
-	return win;
-}
-
-/* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
-	/* Initialize window with OpenGL 4.6 core context */
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	// ??
-	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
-
-	void* win = f_glfw_crwin(wst, title, WIN_DEF);
-	if(!win) return -1;
-
-	glfwSetKeyCallback(win, f_glfw_callback_key);
-	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
-	glfwSetMouseButtonCallback(win, f_glfw_callback_mouseclick);
-	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
-	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
-
-	glfwMakeContextCurrent(win);
-
-	glfwSwapInterval(1);
-	return 0;
-}
 
 
 /* Read file into buffer */
@@ -255,7 +154,8 @@ void f_gl_detachprogshaders(unsigned int sp) {
 /* Arguments are terminated by 0 */
 unsigned int f_gl_genprogram_v(char* infolog, int il_len, va_list args) {
 	unsigned int sp = glCreateProgram();
-	for(unsigned int s; (s = va_arg(args, unsigned int)); )
+	unsigned int s;
+	while((s = va_arg(args, unsigned int)))
 		glAttachShader(sp, s);
 	glLinkProgram(sp);
 	f_gl_chklink(sp, infolog, il_len);
@@ -272,13 +172,13 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, ...) {
 	return sp;
 }
 
-/* Wrapper macro adding terminating 0 */
-#define F_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
-#define F_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
-
 void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
+
+/* Wrapper macro adding terminating 0 */
+#define F_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
+#define F_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 
 enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
 
@@ -290,7 +190,7 @@ void proghandler(enum e_proghandlemethod method) {
 	switch(method) {
 		case PROG_GEN:
 			method = PROG_CR;
-			// fall through
+			/* fall through */
 		case PROG_DEL:
 			glDeleteProgram(sp);
 			glDeleteShader(vert), glDeleteShader(frag);
@@ -303,7 +203,7 @@ void proghandler(enum e_proghandlemethod method) {
 			/* Shader Programs */
 			sp = F_gl_GenProgram(vert, frag);
 			f_gl_detachprogshaders(sp);
-			// fall through
+			/* fall through */
 		case PROG_USE:
 			glUseProgram(sp);
 			break;
@@ -312,15 +212,20 @@ void proghandler(enum e_proghandlemethod method) {
 
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct t_glfw_inputqueue *q) {
-	for(int i = q->start; i != q->end; ++i) {
+	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
 			proghandler(PROG_GEN);
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
 			ws.runstate = 0;
 	}
-	f_iqclear(q);
+	/* Reset queue after evaluation */
+	q->start = 0, q->end = 0;
 }
 
+void f_gl_viewportfitcenter(int width, int height) {
+	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
+	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
+}
 
 float vertices[] = {
 	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,
@@ -333,10 +238,6 @@ unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
-void f_gl_viewportfitcenter(int width, int height) {
-	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
-	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
-}
 
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
@@ -371,8 +272,9 @@ void f_glfw_main(void) {
 	glCullFace(GL_BACK);
 
 	/* Initialize time and loop */
-	double t0 = glfwGetTime(), dt = 0;
 	void* win = glfwGetCurrentContext();
+	double t0 = 0, dt = 0;
+	glfwSetTime(0);
 	do {
 		/* Set viewport and clear screen before drawing */
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
@@ -398,12 +300,114 @@ void f_glfw_main(void) {
 	glDeleteVertexArrays(1, &VAO);
 }
 
+
+
+/* ----------------------- *
+ * GLFW Callback functions *
+ * ----------------------- */
+
+/* Immediately exit on any error encountered by GLFW */
+void f_glfw_callback_error(int err, const char* desc) {
+	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+}
+
+/* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
+/* Additionally store mouse coordinates into queue */
+void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
+	f_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
+	/* Window and scancode remain unused */
+	(void)window, (void)scancode;
+}
+
+/* Cursor position callback: simply update global mouse coordinates */
+void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
+	ws.mx = x, ws.my = y;
+	/* Window remains unused */
+	(void)window;
+}
+
+/* Mouse click callback: same as key callback */
+/* (this assumes mouse clicks and keypresses have distinct keycodes) */
+void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
+	f_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
+	/* Window remains unused */
+	(void)window;
+}
+
+/* Callback for framebuffer resize events (i.e window resize events) */
+void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
+	ws.width = width, ws.height = height, ws.szrefresh = 1;
+	/* Window remains unused */
+	(void)window;
+}
+
+/* Callback for window close event */
+void f_glfw_callback_winclose(GLFWwindow *window) {
+	ws.runstate = 0;
+	(void)window;
+}
+
+
+/* Create window - optionally maximize and make it fullscreen */
+void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
+	GLFWmonitor* mon = glfwGetPrimaryMonitor();
+	if(!mon) return NULL;
+
+	const GLFWvidmode* mode = glfwGetVideoMode(mon);
+	if(!mode) return NULL;
+
+	switch(type) {
+		case WIN_FSCR:
+			glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+			glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+			glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+			glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+			wst->width = mode->width, wst->height = mode->height;
+			break;
+		case WIN_MAX:
+			glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+			/* fall through */
+		case WIN_DEF:
+		default:
+			mon = NULL;
+	}
+
+	void* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
+	return win;
+}
+
+
+/* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
+int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
+	/* Initialize window with OpenGL 4.6 core context */
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	/* ?? */
+	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
+
+	void* win = f_glfw_crwin(wst, title, WIN_DEF);
+	if(!win) return -1;
+
+	glfwSetKeyCallback(win, f_glfw_callback_key);
+	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
+	glfwSetMouseButtonCallback(win, f_glfw_callback_mouseclick);
+	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
+	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
+
+	glfwMakeContextCurrent(win);
+	gladLoadGL(glfwGetProcAddress);
+	glfwSwapInterval(1);
+	return 0;
+}
+
 /* Main function */
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 	if(f_glfw_initwin(&ws, "Tetrahedron")) goto end;
-	gladLoadGL(glfwGetProcAddress);
 
 	f_glfw_main();
 
