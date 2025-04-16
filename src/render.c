@@ -2,11 +2,9 @@
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdarg.h>
-#include <math.h>
+
+#include <stdio.h>
 
 enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 30 };
 
@@ -47,15 +45,14 @@ struct t_glfw_winstate ws = {
 };
 char g_charbuf[CHBUFSZ_] = {0};
 
-/* Destroy window - wrapper function for atexit */
-void f__glfw_window_destroy(void) {
-	glfwDestroyWindow(glfwGetCurrentContext());
+void memclr(void* buf, char c, int n) {
+	for(int i = 0; i < n; ++i) ((char*)buf)[i] = c;
 }
 
 /* Reset input queue */
 void f_iqclear(struct t_glfw_inputqueue *q) {
 	if(!(q->start || q->end)) return;
-	memset(q->queue, 0, IQSZ_ * sizeof(struct t_glfw_inputevent));
+	memclr(q->queue, 0, IQSZ_ * sizeof(struct t_glfw_inputevent));
 	q->start = 0, q->end = 0;
 }
 
@@ -83,7 +80,6 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 /* Immediately exit on any error encountered by GLFW */
 void f_glfw_callback_error(int err, const char* desc) {
 	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
-	exit(EXIT_FAILURE);
 }
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
@@ -127,10 +123,10 @@ enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
 /* Create window - optionally maximize and make it fullscreen */
 void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
-	if(!mon) exit(EXIT_FAILURE);
+	if(!mon) return NULL;
 
 	const GLFWvidmode* mode = glfwGetVideoMode(mon);
-	if(!mode) exit(EXIT_FAILURE);
+	if(!mode) return NULL;
 
 	switch(type) {
 		case WIN_FSCR:
@@ -149,27 +145,22 @@ void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintyp
 	}
 
 	void* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
-	if(!win) exit(EXIT_FAILURE);
 	return win;
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-void f_glfw_initialize(struct t_glfw_winstate *wst, const char* title) {
-	glfwSetErrorCallback(f_glfw_callback_error);
-	glfwInit();
-
-	atexit(glfwTerminate);
-
+int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	/* Initialize window with OpenGL 4.6 core context */
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+	// ??
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
 
 	void* win = f_glfw_crwin(wst, title, WIN_DEF);
-	atexit(f__glfw_window_destroy);
+	if(!win) return -1;
 
 	glfwSetKeyCallback(win, f_glfw_callback_key);
 	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
@@ -178,7 +169,9 @@ void f_glfw_initialize(struct t_glfw_winstate *wst, const char* title) {
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
 	glfwMakeContextCurrent(win);
+
 	glfwSwapInterval(1);
+	return 0;
 }
 
 
@@ -227,7 +220,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charb
 	int len = 0;
 	f_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
-	memset(charbuf, 0, len + 1);
+	memclr(charbuf, 0, len + 1);
 	glCompileShader(s);
 	f_gl_chkcmp(s, charbuf, charbufsz);
 	return s;
@@ -302,22 +295,18 @@ void proghandler(enum e_proghandlemethod method) {
 			glDeleteProgram(sp);
 			glDeleteShader(vert), glDeleteShader(frag);
 			goto create;
-
 		create:
 		case PROG_CR:
 			/* Shaders */
 			vert = F_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
 			frag = F_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
-
 			/* Shader Programs */
 			sp = F_gl_GenProgram(vert, frag);
-
 			f_gl_detachprogshaders(sp);
 			// fall through
 		case PROG_USE:
 			glUseProgram(sp);
 			break;
-
 	}
 }
 
@@ -332,33 +321,9 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	f_iqclear(q);
 }
 
-void rotate3dfx(float pos[3], float out[3], double angle) {
-	out[0] = pos[0];
-	out[1] = pos[1]*cos(angle) + pos[2]*sin(angle);
-	out[2] = -pos[1]*sin(angle) + pos[2]*cos(angle);
-}
-
-void rotate3dfy(float pos[3], float out[3], double angle) {
-	out[1] = pos[1];
-	out[2] = pos[2]*cos(angle) + pos[0]*sin(angle);
-	out[0] = -pos[2]*sin(angle) + pos[0]*cos(angle);
-}
-
-void rotate3dfz(float pos[3], float out[3], double angle) {
-	out[2] = pos[2];
-	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
-	out[1] = -pos[0]*sin(angle) + pos[1]*cos(angle);
-}
-
-void rotate3df(float pos[3], float out[3], double ax, double ay, double az) {
-	float tmp[3];
-	rotate3dfx(pos, out, ax);
-	rotate3dfy(out, tmp, ay);
-	rotate3dfz(tmp, out, az);
-}
 
 float vertices[] = {
-	 0.0f,  0.8f,  0.0f,    0.2f, 0.2f, 0.2f,
+	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,
 	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,
 	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,
 	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,
@@ -368,16 +333,12 @@ unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
-void f_gl_centerfitviewport(int width, int height) {
-	int pad = ws.width > ws.height ? (ws.width - ws.height) / 2 : (ws.height - ws.width) / 2;
+void f_gl_viewportfitcenter(int width, int height) {
+	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
 	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
 }
 
-/* Main function */
-int main(void) {
-	f_glfw_initialize(&ws, "Tetrahedron");
-	gladLoadGL(glfwGetProcAddress);
-
+void f_glfw_main(void) {
 	proghandler(PROG_GEN);
 
 	/* Vertex Array Object */
@@ -396,6 +357,10 @@ int main(void) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
 
@@ -405,15 +370,12 @@ int main(void) {
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	/* Map array buffer to memory */
-	float *vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-
 	/* Initialize time and loop */
 	double t0 = glfwGetTime(), dt = 0;
 	void* win = glfwGetCurrentContext();
-	while(ws.runstate) {
+	do {
 		/* Set viewport and clear screen before drawing */
-		if(ws.szrefresh) f_gl_centerfitviewport(ws.width, ws.height), ws.szrefresh = 0;
+		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
@@ -425,17 +387,27 @@ int main(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
-		for(int i = 0; i < 6; ++i) {
-			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.5*ws.time, 0);
-		}
-	}
+	} while(ws.runstate);
 
 	/* Cleanup */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glDeleteTextures(1, &texobj);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
+}
 
-	exit(EXIT_SUCCESS);
+/* Main function */
+int main(void) {
+	glfwSetErrorCallback(f_glfw_callback_error);
+	if(!glfwInit()) return -1;
+	if(f_glfw_initwin(&ws, "Tetrahedron")) goto end;
+	gladLoadGL(glfwGetProcAddress);
+
+	f_glfw_main();
+
+	glfwDestroyWindow(glfwGetCurrentContext());
+	end: glfwTerminate();
+	return 0;
 }
