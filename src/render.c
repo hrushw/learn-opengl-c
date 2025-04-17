@@ -172,14 +172,16 @@ void updatetime(double *time, double *t0, double *dt) {
 #define F_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
 #define F_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 
-enum e_proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE  };
+enum e_proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE, PROG_GET };
 
-void proghandler(enum e_proghandlemethod method) {
+int proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
 	static unsigned int vert = 0;
 	static unsigned int frag = 0;
 
 	switch(method) {
+		case PROG_GET:
+			return sp;
 		case PROG_GEN:
 		case PROG_DEL:
 			glDeleteProgram(sp);
@@ -199,6 +201,8 @@ void proghandler(enum e_proghandlemethod method) {
 			glUseProgram(sp);
 		default: ;
 	}
+
+	return 0;
 }
 
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
@@ -219,10 +223,10 @@ void f_gl_viewportfitcenter(int width, int height) {
 }
 
 float vertices[] = {
-	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,
-	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,
-	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,
-	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,
+	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
 };
 
 unsigned int indices[] = {
@@ -254,13 +258,13 @@ void rotate3df(float pos[3], float out[3], double anglex, double angley, double 
 	rotate3dfz(tmp, out, anglez);
 }
 
+double distance(float pos[3]) {
+	return pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2];
+}
+
 /* Main function wrapped around glfw initalization and window creation */
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
-
-// 	float vrot[sizeof(vertices)/sizeof(*vertices)];
-// 	for(int i = 0; i < 24; ++i)
-// 		vrot[i] = vertices[i];
 
 	/* Vertex Array Object */
 	unsigned int VAO;
@@ -282,17 +286,24 @@ void f_glfw_main(void) {
 	unsigned int texobj;
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	float pixels[] = {
-		1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f
+		1.0f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,
+		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f
 	};
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
@@ -305,7 +316,7 @@ void f_glfw_main(void) {
 	do {
 		/* Set viewport and clear screen before drawing */
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
@@ -319,7 +330,7 @@ void f_glfw_main(void) {
 
 		/* Rotate */
 		for(int i = 0; i < 4; ++i)
-			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.8*ws.time, 0);
+			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.8*ws.time, 0);
 	} while(ws.runstate);
 
 	/* Cleanup */
@@ -426,7 +437,7 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 
 	glfwMakeContextCurrent(win);
 	gladLoadGL(glfwGetProcAddress);
-	glfwSwapInterval(1);
+	glfwSwapInterval(0);
 	return 0;
 }
 
