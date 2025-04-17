@@ -258,9 +258,9 @@ void rotate3df(float pos[3], float out[3], double anglex, double angley, double 
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
 
-	float vrot[sizeof(vertices)/sizeof(*vertices)];
-	for(int i = 0; i < 24; ++i)
-		vrot[i] = vertices[i];
+// 	float vrot[sizeof(vertices)/sizeof(*vertices)];
+// 	for(int i = 0; i < 24; ++i)
+// 		vrot[i] = vertices[i];
 
 	/* Vertex Array Object */
 	unsigned int VAO;
@@ -271,13 +271,17 @@ void f_glfw_main(void) {
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vrot), vrot, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	float* vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 
 	unsigned int EBO;
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
 	float pixels[] = {
 		1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f
@@ -303,7 +307,6 @@ void f_glfw_main(void) {
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vrot), vrot, GL_DYNAMIC_DRAW);
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
@@ -313,13 +316,16 @@ void f_glfw_main(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
+
+		/* Rotate */
 		for(int i = 0; i < 4; ++i)
-			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.05*ws.time, 0);
+			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.8*ws.time, 0);
 	} while(ws.runstate);
 
 	/* Cleanup */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glDeleteTextures(1, &texobj);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
