@@ -258,10 +258,6 @@ void rotate3df(float pos[3], float out[3], double anglex, double angley, double 
 	rotate3dfz(tmp, out, anglez);
 }
 
-double distance(float pos[3]) {
-	return pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2];
-}
-
 /* Main function wrapped around glfw initalization and window creation */
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
@@ -437,7 +433,7 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 
 	glfwMakeContextCurrent(win);
 	gladLoadGL(glfwGetProcAddress);
-	glfwSwapInterval(0);
+	glfwSwapInterval(1);
 	return 0;
 }
 

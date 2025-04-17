@@ -8,5 +8,5 @@ out vec4 frag_clr;
 uniform sampler2D texobj;
 
 void main() {
-	frag_clr = texture(texobj, tex_crd) * vec4(color, 1.0f);
+	frag_clr = (0.6*texture(texobj, tex_crd) + 0.4*vec4(color, 1.0f));
 }
