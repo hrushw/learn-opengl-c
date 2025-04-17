@@ -69,7 +69,6 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 /* Read file into buffer */
 /* No longer causes program exit on failure */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
-	printf("Reading file '%s' to buffer...\n", path);
 	FILE* f = fopen(path, "rb");
 	long l;
 	if(!f) {
@@ -179,18 +178,6 @@ void proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
 	static unsigned int vert = 0;
 	static unsigned int frag = 0;
-
-	switch(method) {
-		case PROG_GEN:
-			printf("Generating shader program...\n");
-			break;
-		case PROG_DEL:
-			printf("Deleting shader program and associated objects...\n");
-			break;
-		case PROG_USE:
-			printf("Assigning shader program for use...\n");
-			break;
-	}
 
 	switch(method) {
 		case PROG_GEN:
@@ -393,7 +380,6 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
-	printf("Creating GLFW window...\n");
 	void* win = f_glfw_crwin(wst, title, WIN_DEF);
 	if(!win) return -1;
 
@@ -412,13 +398,11 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 /* Main function */
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
-	printf("Initializing GLFW...\n");
 	if(!glfwInit()) return -1;
 	if(f_glfw_initwin(&ws, "Tetrahedron")) goto end;
 
 	f_glfw_main();
 
-	printf("Destroying window and terminating GLFW...\n");
 	glfwDestroyWindow(glfwGetCurrentContext());
 	end: glfwTerminate();
 	return 0;
