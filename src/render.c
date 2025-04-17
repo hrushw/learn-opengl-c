@@ -43,11 +43,9 @@ struct t_glfw_winstate ws = {
 		.queue = {{0}}
 	},
 };
+
 char g_charbuf[CHBUFSZ_] = {0};
 
-void memclr(void* buf, char c, int n) {
-	for(; n >= 0; --n) ((char*)buf)[n] = c;
-}
 
 /* Append to queue - bounds check merged with function */
 void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
@@ -67,12 +65,11 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 	q->end = (q->end + 1) % (2*IQSZ_);
 }
 
-enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
-
 
 /* Read file into buffer */
 /* No longer causes program exit on failure */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
+	printf("Reading file '%s' to buffer...\n", path);
 	FILE* f = fopen(path, "rb");
 	long l;
 	if(!f) {
@@ -87,6 +84,7 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
 	else {
+		/* Always return null-terminated string */
 		buf[l] = 0;
 		if(len) *len = l;
 	}
@@ -115,7 +113,6 @@ unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charb
 	int len = 0;
 	f_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
-	// memclr(charbuf, 0, len + 1);
 	glCompileShader(s);
 	f_gl_chkcmp(s, charbuf, charbufsz);
 	return s;
@@ -185,6 +182,18 @@ void proghandler(enum e_proghandlemethod method) {
 
 	switch(method) {
 		case PROG_GEN:
+			printf("Generating shader program...\n");
+			break;
+		case PROG_DEL:
+			printf("Deleting shader program and associated objects...\n");
+			break;
+		case PROG_USE:
+			printf("Assigning shader program for use...\n");
+			break;
+	}
+
+	switch(method) {
+		case PROG_GEN:
 		case PROG_DEL:
 			glDeleteProgram(sp);
 			glDeleteShader(vert), glDeleteShader(frag);
@@ -208,9 +217,9 @@ void proghandler(enum e_proghandlemethod method) {
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct t_glfw_inputqueue *q) {
 	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
-		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL)
+		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
 			proghandler(PROG_GEN);
-		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) )
+		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && q->queue[i].action == GLFW_RELEASE )
 			ws.runstate = 0;
 	}
 	/* Reset queue after evaluation */
@@ -254,10 +263,6 @@ void f_glfw_main(void) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_2D, texobj);
-
 	float pixels[] = {
 		1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f
@@ -296,7 +301,6 @@ void f_glfw_main(void) {
 	/* Cleanup */
 	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
-	glDeleteTextures(1, &texobj);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
@@ -310,7 +314,7 @@ void f_glfw_main(void) {
 
 /* Immediately exit on any error encountered by GLFW */
 void f_glfw_callback_error(int err, const char* desc) {
-	fprintf(stderr, "GLFW ERROR: %s\n(Error code - %d)\n", desc, err);
+	fprintf(stderr, "GLFW Error: \n%s\n(Error code - %d)\n", desc, err);
 }
 
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
@@ -350,6 +354,8 @@ void f_glfw_callback_winclose(GLFWwindow *window) {
 }
 
 
+enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
+
 /* Create window - optionally maximize and make it fullscreen */
 void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintype type) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
@@ -387,6 +393,7 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
+	printf("Creating GLFW window...\n");
 	void* win = f_glfw_crwin(wst, title, WIN_DEF);
 	if(!win) return -1;
 
@@ -405,11 +412,13 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 /* Main function */
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
+	printf("Initializing GLFW...\n");
 	if(!glfwInit()) return -1;
 	if(f_glfw_initwin(&ws, "Tetrahedron")) goto end;
 
 	f_glfw_main();
 
+	printf("Destroying window and terminating GLFW...\n");
 	glfwDestroyWindow(glfwGetCurrentContext());
 	end: glfwTerminate();
 	return 0;
