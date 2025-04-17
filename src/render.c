@@ -70,11 +70,9 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 /* No longer causes program exit on failure */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* f = fopen(path, "rb");
-	long l;
-	if(!f) {
-		fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
-		return;
-	} else if( fseek(f, 0L, SEEK_END) == -1 )
+	long l = 0;
+	if(!f) goto failopen;
+	else if( fseek(f, 0L, SEEK_END) == -1 )
 		fprintf(stderr, "ERROR: Failed to seek to end of file '%s'!\n", path);
 	else if( (l = ftell(f)) < 0 )
 		fprintf(stderr, "ERROR: Failed to get size of file '%s'\n", path);
@@ -82,13 +80,14 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 		fprintf(stderr, "ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, buflen - 1);
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
-	else {
-		/* Always return null-terminated string */
-		buf[l] = 0;
-		if(len) *len = l;
-	}
 
+	/* Always return null-terminated string */
+	buf[l] = 0;
+	if(len) *len = l;
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
+	return;
+
+	failopen: fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
 }
 
 /* Check if shader was compiled successfully */
@@ -229,7 +228,6 @@ unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
-
 /* Main function wrapped around glfw initalization and window creation */
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
@@ -365,10 +363,7 @@ void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintyp
 		case WIN_DEF:
 		default:
 			mon = NULL;
-	}
-
-	void* win = glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
-	return win;
+	} return glfwCreateWindow(wst->width, wst->height, title, mon, NULL);
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
