@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 
-enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 30 };
+enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 16 };
 
 /* Keypress struct - don't care about scancode or window */
 struct t_glfw_inputevent {
@@ -49,20 +49,16 @@ void memclr(void* buf, char c, int n) {
 	for(; n >= 0; --n) ((char*)buf)[n] = c;
 }
 
-/* Check if input queue is set properly - else print error message and reset  */
-void f_iqcheck(struct t_glfw_inputqueue *q) {
+/* Append to queue - bounds check merged with function */
+void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
 	/* Bounds check for queue just in case */
 	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(! (q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) )
-		return; 
+	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) {
+		/* If bounds check fails, log error and reset the queue */
+		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
+		q->start = 0, q->end = 0;
+	}
 
-	/* If bounds check fails, log error and reset the queue */
-	fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
-	q->start = 0, q->end = 0;
-}
-
-void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
-	f_iqcheck(q);
 	q->queue[q->end] = (struct t_glfw_inputevent) {
 		.key = key, .action = action, .mods = mods,
 		/* Mouse x,y coordinates and time are not rechecked in key callback function */
@@ -119,7 +115,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charb
 	int len = 0;
 	f_io_filetobuf(path, &len, charbuf, charbufsz);
 	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
-	memclr(charbuf, 0, len + 1);
+	// memclr(charbuf, 0, len + 1);
 	glCompileShader(s);
 	f_gl_chkcmp(s, charbuf, charbufsz);
 	return s;
@@ -180,7 +176,7 @@ void updatetime(double *time, double *t0, double *dt) {
 #define F_gl_GenProgram(...) f_gl_genprogram(g_charbuf, CHBUFSZ_, __VA_ARGS__ __VA_OPT__(,) 0)
 #define F_gl_GenShader(path, type) f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 
-enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
+enum e_proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE  };
 
 void proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
@@ -189,24 +185,23 @@ void proghandler(enum e_proghandlemethod method) {
 
 	switch(method) {
 		case PROG_GEN:
-			method = PROG_CR;
-			/* fall through */
 		case PROG_DEL:
 			glDeleteProgram(sp);
 			glDeleteShader(vert), glDeleteShader(frag);
-			goto create;
-		create:
-		case PROG_CR:
-			/* Shaders */
+			break;
+		default: ;
+	}
+
+	switch(method) {
+		case PROG_GEN:
 			vert = F_gl_GenShader("vertex.glsl", GL_VERTEX_SHADER);
 			frag = F_gl_GenShader("fragment.glsl", GL_FRAGMENT_SHADER);
-			/* Shader Programs */
 			sp = F_gl_GenProgram(vert, frag);
 			f_gl_detachprogshaders(sp);
 			/* fall through */
 		case PROG_USE:
 			glUseProgram(sp);
-			break;
+		default: ;
 	}
 }
 
@@ -239,6 +234,7 @@ unsigned int indices[] = {
 };
 
 
+/* Main function wrapped around glfw initalization and window creation */
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
 
@@ -261,6 +257,12 @@ void f_glfw_main(void) {
 	unsigned int texobj;
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	float pixels[] = {
+		1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f
+	};
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
@@ -376,7 +378,6 @@ void* f_glfw_crwin(struct t_glfw_winstate *wst, const char* title, enum e_wintyp
 	return win;
 }
 
-
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
 int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	/* Initialize window with OpenGL 4.6 core context */
@@ -384,9 +385,7 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	/* ?? */
-	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE);
+	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
 	void* win = f_glfw_crwin(wst, title, WIN_DEF);
 	if(!win) return -1;
