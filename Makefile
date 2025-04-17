@@ -2,7 +2,7 @@ CC = gcc -Wall -Wextra -Wvla -Wpedantic
 INC = -I ./include
 
 render: obj/render.o obj/gl.o
-	$(CC) -lglfw obj/render.o obj/gl.o -o render
+	$(CC) -lglfw -lm obj/render.o obj/gl.o -o render
 
 obj/render.o: src/render.c
 	$(CC) src/render.c $(INC) -c -o obj/render.o

@@ -5,6 +5,7 @@
 #include <stdarg.h>
 
 #include <stdio.h>
+#include <math.h>
 
 enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 16 };
 
@@ -228,9 +229,38 @@ unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
+void rotate3dfx(float pos[3], float out[3], double angle) {
+	out[0] = pos[0];
+	out[1] = pos[1]*cos(angle) + pos[2]*sin(angle);
+	out[2] = - pos[1]*sin(angle) + pos[2]*cos(angle);
+}
+
+void rotate3dfy(float pos[3], float out[3], double angle) {
+	out[1] = pos[1];
+	out[2] = pos[2]*cos(angle) + pos[0]*sin(angle);
+	out[0] = - pos[2]*sin(angle) + pos[0]*cos(angle);
+}
+
+void rotate3dfz(float pos[3], float out[3], double angle) {
+	out[2] = pos[2];
+	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
+	out[1] = - pos[0]*sin(angle) + pos[1]*cos(angle);
+}
+
+void rotate3df(float pos[3], float out[3], double anglex, double angley, double anglez) {
+	float tmp[3] = {0};
+	rotate3dfx(pos, out, anglex);
+	rotate3dfy(out, tmp, angley);
+	rotate3dfz(tmp, out, anglez);
+}
+
 /* Main function wrapped around glfw initalization and window creation */
 void f_glfw_main(void) {
 	proghandler(PROG_GEN);
+
+	float vrot[sizeof(vertices)/sizeof(*vertices)];
+	for(int i = 0; i < 24; ++i)
+		vrot[i] = vertices[i];
 
 	/* Vertex Array Object */
 	unsigned int VAO;
@@ -241,7 +271,7 @@ void f_glfw_main(void) {
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vrot), vrot, GL_DYNAMIC_DRAW);
 
 	unsigned int EBO;
 	glGenBuffers(1, &EBO);
@@ -263,6 +293,7 @@ void f_glfw_main(void) {
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
+
 	/* Initialize time and loop */
 	void* win = glfwGetCurrentContext();
 	double t0 = 0, dt = 0;
@@ -272,6 +303,7 @@ void f_glfw_main(void) {
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vrot), vrot, GL_DYNAMIC_DRAW);
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
@@ -281,6 +313,8 @@ void f_glfw_main(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
+		for(int i = 0; i < 4; ++i)
+			rotate3df(vertices + 6*i, vrot + 6*i, ws.time, 0.05*ws.time, 0);
 	} while(ws.runstate);
 
 	/* Cleanup */
