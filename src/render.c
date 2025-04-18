@@ -439,10 +439,6 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 
 /* Main function */
 int main(void) {
-	struct integer { int num; };
-	struct integer x = { 1 }, y = { 2 };
-	printf("%lld\n", x * y);
-
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 	if(f_glfw_initwin(&ws, "Tetrahedron")) goto end;
