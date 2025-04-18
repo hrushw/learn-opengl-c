@@ -1,8 +1,6 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-
-#include <epoxy/gl.h>
-#include <epoxy/glx.h>
+#include <glad/gl.h>
 
 #include <stdarg.h>
 
@@ -434,6 +432,7 @@ int f_glfw_initwin(struct t_glfw_winstate *wst, const char* title) {
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
 	glfwMakeContextCurrent(win);
+	gladLoadGL(glfwGetProcAddress);
 	glfwSwapInterval(1);
 	return 0;
 }
