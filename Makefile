@@ -1,13 +1,13 @@
 CC = gcc -Wall -Wextra -Wvla -Wpedantic
 INC = -I ./include
 
-render: obj/render.o
-	$(CC) -lglfw -lm -lepoxy obj/render.o -o render
+render: render.o
+	$(CC) -lglfw -lm -lepoxy render.o -o render
 
-obj/render.o: src/render.c
-	$(CC) src/render.c $(INC) -c -o obj/render.o
+render.o: render.c
+	$(CC) render.c $(INC) -c -o render.o
 
 clean:
-	rm -f obj/*.o render
+	rm -f *.o render
 
 all: render
