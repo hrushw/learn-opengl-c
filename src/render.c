@@ -135,11 +135,9 @@ void f_gl_chklink(unsigned int sp, char *infolog, int il_len) {
 /* Get all shaders attached to a program, detach them and delete them */
 void f_gl_detachprogshaders(unsigned int sp) {
 	int n = 0;
-	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n) {
-		unsigned int s;
-		glGetAttachedShaders(sp, 1, NULL, &s);
-		glDetachShader(sp, s);
-	}
+	unsigned int s;
+	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n)
+		glGetAttachedShaders(sp, 1, NULL, &s), glDetachShader(sp, s);
 }
 
 unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsigned int frag) {
@@ -155,11 +153,11 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsig
 
 /* Wrappers to use global buffer */
 
-unsigned int f_gl_genshader_g(const char* path, int type) {
+static inline unsigned int f_gl_genshader_g(const char* path, int type) {
 	return f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 }
 
-unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
+static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
 	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
 }
 
@@ -195,7 +193,7 @@ int proghandler(enum e_proghandlemethod method) {
 	return 0;
 }
 
-void updatetime(double *time, double *t0, double *dt) {
+static inline void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
 
@@ -205,6 +203,8 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
 		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
 			proghandler(PROG_GEN);
+		if(q->queue[i].key == GLFW_KEY_T && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
+			glfwSetTime(0.0), ws.time = 0;
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && q->queue[i].action == GLFW_RELEASE )
 			ws.runstate = 0;
 	}
@@ -220,9 +220,9 @@ void f_gl_viewportfitcenter(int width, int height) {
 /* xyz coordinates, rgb colors, texture coordinates  */
 float vertices[] = {
 	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
-	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
-	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 2.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    2.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    2.0f, 2.0f
 };
 
 /* Index data for rendering as triangle strip */
@@ -303,9 +303,13 @@ void f_glfw_main() {
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
+	/* Enable right handed (sensible) z axis when rendering */
+	glDepthRange(1, 0);
+	glEnable(GL_DEPTH_TEST);
 
+	/* Culling overrides the depth test ??? */
+	// glEnable(GL_CULL_FACE);
+	// glCullFace(GL_BACK);
 
 	/* Initialize time and loop */
 	double t0 = 0, dt = 0;
@@ -313,7 +317,7 @@ void f_glfw_main() {
 	do {
 		/* Set viewport and clear screen before drawing */
 		ws.szrefresh ? f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0 : 0;
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
