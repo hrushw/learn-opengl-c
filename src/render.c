@@ -46,6 +46,7 @@ struct t_glfw_winstate ws = {
 		.queue = {{0}}
 	},
 };
+/* TODO: eventually enable using multiple windows? */
 
 char g_charbuf[CHBUFSZ_] = {0};
 
@@ -71,6 +72,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 
 /* Read file into buffer */
 /* No longer causes program exit on failure */
+/* Returns length 0 on any failure, always null terminated */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* f = fopen(path, "rb");
 	long l = 0;
@@ -157,14 +159,19 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsig
 	return sp;
 }
 
-/* Wrappers to use global buffer */
-
+/* Wrappers for shader and program generation functions using global character buffer */
 static inline unsigned int f_gl_genshader_g(const char* path, int type) {
 	return f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 }
 
 static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
 	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
+}
+
+/* center and 1:1 the OpenGL viewport (perhaps there is a better way of maintaining aspect ratio) */
+void f_gl_viewportfitcenter(int width, int height) {
+	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
+	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
 }
 
 
@@ -199,9 +206,18 @@ float pixels[] = {
 
 
 
-enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
+/* Shader program wrapper using static variables to enable hot reloading */
 
-int proghandler(enum e_proghandlemethod method) {
+enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE, PROG_UNIUP };
+
+/* This function handles generation, data and cleanup of shaders and the shader program.       *
+ * The wrapper functions only print the error message on failure, but still return the         *
+ * created shader/program object rather than destroying them, leaving cleanup to this function */
+
+/* when this function is called with PROG_GEN, previously created objects are  *
+ * deleted automatically regardless of compilation errors.                     */
+
+void proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
 	static unsigned int vert = 0;
 	static unsigned int frag = 0;
@@ -230,11 +246,12 @@ int proghandler(enum e_proghandlemethod method) {
 			/* Provide uniform only AFTER calling glUseProgram */
 			transformloc = glGetUniformLocation(sp, "transform");
 			if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+			else
+			/* fall through */
+		case PROG_UNIUP:
 			glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
 		default: ;
 	}
-
-	return 0;
 }
 
 static inline void updatetime(double *time, double *t0, double *dt) {
@@ -255,12 +272,6 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	/* Reset queue after evaluation */
 	q->start = 0, q->end = 0;
 }
-
-void f_gl_viewportfitcenter(int width, int height) {
-	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
-	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
-}
-
 
 void rotate3dfx(float pos[3], float out[3], double angle) {
 	out[0] = pos[0];
@@ -287,29 +298,9 @@ void rotate3df(float pos[3], float out[3], double anglex, double angley, double 
 	rotate3dfz(tmp, out, anglez);
 }
 
-/* Assign data to already bound OpenGL objects */
-void f_gl_initdata(void) {
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_FLOAT, pixels);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
-
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
-
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
-}
 
 /* Basic initialization and main render loop */
-void f_gl_runloop(void) {
+void f_render_loop(void) {
 	/* Enable right handed (sensible) z axis when rendering */
 	glDepthRange(1, 0);
 	glEnable(GL_DEPTH_TEST);
@@ -341,15 +332,36 @@ void f_gl_runloop(void) {
 
 		/* Rotate */
 		for(int i = 0; i < 4; ++i)
-			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.8*ws.time, 0);
+			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.2*ws.time, 0);
 	} while(ws.runstate);
 
 	/* Unmap buffer */
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
+/* Assign data to already bound OpenGL objects */
+void f_render_init(void) {
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_FLOAT, pixels);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
+}
+
 /* Main function wrapped around glfw initalization and window creation */
-void f_glfw_gl_main(void) {
+void f_render_main(void) {
 	/* Generate and bind objects */
 	proghandler(PROG_CR);
 
@@ -369,8 +381,8 @@ void f_glfw_gl_main(void) {
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
-	f_gl_initdata();
-	f_gl_runloop();
+	f_render_init();
+	f_render_loop();
 
 	/* Cleanup */
 	glDeleteTextures(1, &texobj);
@@ -485,7 +497,7 @@ int main(void) {
 	if(!(ws.win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
 	glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 
-	f_glfw_gl_main();
+	f_render_main();
 
 	glfwDestroyWindow(ws.win);
 	end: glfwTerminate();
