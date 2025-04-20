@@ -161,6 +161,7 @@ static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int fra
 	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
 }
 
+
 /* strange issues with clipping when offsetting z */
 float transform[] = {
 	0.6f, 0.0f, 0.0f, 0.4f,
@@ -169,8 +170,30 @@ float transform[] = {
 	0.0f, 0.0f, 0.0f, 1.0f
 };
 
+/* xyz coordinates, rgb colors, texture coordinates  */
+float vertices[] = {
+	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 2.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    2.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    2.0f, 2.0f
+};
 
-enum e_proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE };
+/* Index data for rendering as triangle strip */
+unsigned int indices[] = {
+	0, 1, 2, 3, 0, 1
+};
+
+/* 4x4 RGB pixel data */
+float pixels[] = {
+	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+};
+
+
+
+enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE };
 
 int proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
@@ -188,6 +211,7 @@ int proghandler(enum e_proghandlemethod method) {
 	}
 
 	switch(method) {
+		case PROG_CR:
 		case PROG_GEN:
 			vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
 			frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
@@ -231,26 +255,6 @@ void f_gl_viewportfitcenter(int width, int height) {
 	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
 }
 
-/* xyz coordinates, rgb colors, texture coordinates  */
-float vertices[] = {
-	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
-	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 2.0f,
-	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    2.0f, 0.0f,
-	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    2.0f, 2.0f
-};
-
-/* Index data for rendering as triangle strip */
-unsigned int indices[] = {
-	0, 1, 2, 3, 0, 1
-};
-
-/* 4x4 RGB pixel data */
-float pixels[] = {
-	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-};
 
 void rotate3dfx(float pos[3], float out[3], double angle) {
 	out[0] = pos[0];
@@ -277,30 +281,10 @@ void rotate3df(float pos[3], float out[3], double anglex, double angley, double 
 	rotate3dfz(tmp, out, anglez);
 }
 
-/* Main function wrapped around glfw initalization and window creation */
-void f_glfw_main() {
-	proghandler(PROG_GEN);
-
-	/* Vertex Array Object */
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	/* Vertex buffer object */
-	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+/* Assign data to already bound OpenGL objects */
+void f_gl_initdata(void) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-	float* vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
-
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_2D, texobj);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -316,7 +300,10 @@ void f_glfw_main() {
 
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
+}
 
+/* Basic initialization and main render loop */
+void f_gl_runloop(void) {
 	/* Enable right handed (sensible) z axis when rendering */
 	glDepthRange(1, 0);
 	glEnable(GL_DEPTH_TEST);
@@ -325,6 +312,7 @@ void f_glfw_main() {
 	// glEnable(GL_CULL_FACE);
 	// glCullFace(GL_BACK);
 
+	float* vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	/* Initialize time and loop */
 	double t0 = 0, dt = 0;
 	glfwSetTime(0);
@@ -348,13 +336,39 @@ void f_glfw_main() {
 			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.8*ws.time, 0);
 	} while(ws.runstate);
 
-	/* Cleanup */
-	proghandler(PROG_DEL);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
+}
+
+/* Main function wrapped around glfw initalization and window creation */
+void f_glfw_gl_main(void) {
+	/* Generate and bind objects */
+	proghandler(PROG_CR);
+
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	f_gl_initdata();
+	f_gl_runloop();
+
+	/* Cleanup */
 	glDeleteTextures(1, &texobj);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
+	proghandler(PROG_DEL);
 }
 
 
@@ -462,7 +476,7 @@ int main(void) {
 	if(!(ws.win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
 	glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 
-	f_glfw_main();
+	f_glfw_gl_main();
 
 	glfwDestroyWindow(ws.win);
 	end: glfwTerminate();
