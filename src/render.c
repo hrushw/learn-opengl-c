@@ -19,6 +19,8 @@ struct t_glfw_inputqueue {
 	struct t_glfw_inputevent queue[IQSZ_];
 };
 
+/* Global structure for the purpose of being modified by GLFW callback functions */
+/* win is required for swapping buffers */
 struct t_glfw_winstate {
 	void* win;
 	int width, height;
@@ -81,8 +83,12 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 		fprintf(stderr, "ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, buflen - 1);
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
+	else goto finish;
+	/* On any read failures return empty string */
+	l = 0;
 
 	/* Always return null-terminated string */
+	finish:
 	buf[l] = 0;
 	if(len) *len = l;
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
@@ -312,7 +318,9 @@ void f_gl_runloop(void) {
 	// glEnable(GL_CULL_FACE);
 	// glCullFace(GL_BACK);
 
+	/* Map buffer */
 	float* vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+
 	/* Initialize time and loop */
 	double t0 = 0, dt = 0;
 	glfwSetTime(0);
@@ -336,6 +344,7 @@ void f_gl_runloop(void) {
 			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.8*ws.time, 0);
 	} while(ws.runstate);
 
+	/* Unmap buffer */
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
