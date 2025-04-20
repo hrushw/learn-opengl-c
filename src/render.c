@@ -161,6 +161,14 @@ static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int fra
 	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
 }
 
+/* strange issues with clipping when offsetting z */
+float transform[] = {
+	0.6f, 0.0f, 0.0f, 0.4f,
+	0.0f, 0.6f, 0.0f, 0.3f,
+	0.0f, 0.0f, 0.6f, 0.0f,
+	0.0f, 0.0f, 0.0f, 1.0f
+};
+
 
 enum e_proghandlemethod { PROG_GEN, PROG_DEL, PROG_USE };
 
@@ -168,6 +176,7 @@ int proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
 	static unsigned int vert = 0;
 	static unsigned int frag = 0;
+	static int transformloc = 0;
 
 	switch(method) {
 		case PROG_GEN:
@@ -187,6 +196,11 @@ int proghandler(enum e_proghandlemethod method) {
 			/* fall through */
 		case PROG_USE:
 			glUseProgram(sp);
+
+			/* Provide uniform only AFTER calling glUseProgram */
+			transformloc = glGetUniformLocation(sp, "transform");
+			if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+			glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
 		default: ;
 	}
 
