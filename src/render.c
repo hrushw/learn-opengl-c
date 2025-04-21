@@ -31,7 +31,6 @@ struct t_glfw_winstate {
 	struct t_glfw_inputqueue iq;
 	int szrefresh;
 	int runstate;
-	char charbuf[CHBUFSZ_];
 };
 
 /* Window state - global structure */
@@ -46,9 +45,9 @@ struct t_glfw_winstate ws = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
 	},
-	.charbuf = {0},
 };
 /* TODO: eventually enable using multiple windows? */
+char g_charbuf[CHBUFSZ_] = {0};
 
 
 /* Append to queue - bounds check merged with function */
@@ -140,14 +139,6 @@ void f_gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
-/* Get all shaders attached to a program, detach them and delete them */
-void f_gl_detachprogshaders(unsigned int sp) {
-	int n = 0;
-	unsigned int s;
-	while(glGetProgramiv(sp, GL_ATTACHED_SHADERS, &n), n)
-		glGetAttachedShaders(sp, 1, NULL, &s), glDetachShader(sp, s);
-}
-
 unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsigned int frag) {
 	unsigned int sp = glCreateProgram();
 
@@ -161,11 +152,11 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsig
 
 /* Wrappers for shader and program generation functions using global character buffer */
 static inline unsigned int f_gl_genshader_g(const char* path, int type) {
-	return f_gl_genshader(path, type, ws.charbuf, CHBUFSZ_);
+	return f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
 }
 
 static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
-	return f_gl_genprogram(ws.charbuf, CHBUFSZ_, vert, frag);
+	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
 }
 
 /* center and 1:1 the OpenGL viewport (perhaps there is a better way of maintaining aspect ratio) */
@@ -193,49 +184,8 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	q->start = 0, q->end = 0;
 }
 
-/* Basic initialization and main render loop */
-void f_render_loop(void) {
-}
-
-
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void) {
-	/* Generate and bind objects */
-	unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
-	unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
-	unsigned int sp = f_gl_genprogram_g(vert, frag);
-	f_gl_detachprogshaders(sp);
-
-	glUseProgram(sp);
-
-	/* strange issues with clipping when offsetting z */
-	float transform[] = {
-		0.6f, 0.0f, 0.0f, 0.4f,
-		0.0f, 0.6f, 0.0f, 0.3f,
-		0.0f, 0.0f, 0.6f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
-
-	int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
-
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_2D, texobj);
-
 	/* xyz coordinates, rgb colors, texture coordinates  */
 	float vertices[] = {
 		 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
@@ -256,6 +206,46 @@ void f_render_main(void) {
 		0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
 		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 	};
+
+	/* strange issues with clipping when offsetting z */
+	float transform[] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+
+	/* Generate and bind objects */
+	unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
+	unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
+	unsigned int sp = f_gl_genprogram_g(vert, frag);
+
+	glDetachShader(sp, vert);
+	glDetachShader(sp, frag);
+	glUseProgram(sp);
+
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	int transformloc;
+	transformloc = glGetUniformLocation(sp, "transform");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
+
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
@@ -285,13 +275,14 @@ void f_render_main(void) {
 	// glCullFace(GL_BACK);
 
 	/* Initialize time and loop */
-	double t0 = 0, dt = 0;
 	glfwSetTime(0);
 	do {
+		static double t0 = 0, dt = 0;
 		/* Set viewport and clear screen before drawing */
 		ws.szrefresh ? f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0 : 0;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
@@ -301,6 +292,11 @@ void f_render_main(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
+
+		transform[0] = cos(ws.time);
+		transform[2] = sin(ws.time);
+		transform[8] = -sin(ws.time);
+		transform[10] = cos(ws.time);
 	} while(ws.runstate);
 
 	/* Cleanup */
