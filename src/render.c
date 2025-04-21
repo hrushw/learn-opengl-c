@@ -31,6 +31,7 @@ struct t_glfw_winstate {
 	struct t_glfw_inputqueue iq;
 	int szrefresh;
 	int runstate;
+	char charbuf[CHBUFSZ_];
 };
 
 /* Window state - global structure */
@@ -45,10 +46,9 @@ struct t_glfw_winstate ws = {
 		.start = 0, .end = 0,
 		.queue = {{0}}
 	},
+	.charbuf = {0},
 };
 /* TODO: eventually enable using multiple windows? */
-
-char g_charbuf[CHBUFSZ_] = {0};
 
 
 /* Append to queue - bounds check merged with function */
@@ -161,80 +161,17 @@ unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsig
 
 /* Wrappers for shader and program generation functions using global character buffer */
 static inline unsigned int f_gl_genshader_g(const char* path, int type) {
-	return f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
+	return f_gl_genshader(path, type, ws.charbuf, CHBUFSZ_);
 }
 
 static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
-	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
+	return f_gl_genprogram(ws.charbuf, CHBUFSZ_, vert, frag);
 }
 
 /* center and 1:1 the OpenGL viewport (perhaps there is a better way of maintaining aspect ratio) */
 void f_gl_viewportfitcenter(int width, int height) {
 	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
 	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
-}
-
-
-/* strange issues with clipping when offsetting z */
-float transform[] = {
-	0.6f, 0.0f, 0.0f, 0.4f,
-	0.0f, 0.6f, 0.0f, 0.3f,
-	0.0f, 0.0f, 0.6f, 0.0f,
-	0.0f, 0.0f, 0.0f, 1.0f
-};
-
-/* xyz coordinates, rgb colors, texture coordinates  */
-float vertices[] = {
-	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
-	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
-	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
-};
-
-/* Index data for rendering as triangle strip */
-unsigned int indices[] = {
-	0, 1, 2, 3, 0, 1
-};
-
-/* 4x4 RGB pixel data */
-float pixels[] = {
-	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-};
-
-
-struct t_gl_shaderdata {
-	unsigned int sp;
-	unsigned int vert, frag;
-};
-
-struct t_gl_shaderdata g_shd = {0, 0, 0};
-
-void f_gl_prog_create(void) {
-	static int transformloc = 0;
-
-	g_shd.vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
-	g_shd.frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
-	g_shd.sp = f_gl_genprogram_g(g_shd.vert, g_shd.frag);
-	f_gl_detachprogshaders(g_shd.sp);
-
-	glUseProgram(g_shd.sp);
-	transformloc = glGetUniformLocation(g_shd.sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
-}
-
-void f_gl_prog_destroy(void) {
-	glDeleteProgram(g_shd.sp);
-	glDeleteShader(g_shd.vert);
-	glDeleteShader(g_shd.frag);
-}
-
-void f_gl_prog_regen(void) {
-	f_gl_prog_create();
-	f_gl_prog_destroy();
 }
 
 static inline void updatetime(double *time, double *t0, double *dt) {
@@ -245,8 +182,8 @@ static inline void updatetime(double *time, double *t0, double *dt) {
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct t_glfw_inputqueue *q) {
 	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
-		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
-			f_gl_prog_regen();
+		// if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
+		// 	f_gl_prog_destroy(), f_gl_prog_create();
 		if(q->queue[i].key == GLFW_KEY_T && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
 			glfwSetTime(0.0), ws.time = 0;
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && q->queue[i].action == GLFW_RELEASE )
@@ -258,6 +195,87 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 
 /* Basic initialization and main render loop */
 void f_render_loop(void) {
+}
+
+
+/* Main function wrapped around glfw initalization and window creation */
+void f_render_main(void) {
+	/* Generate and bind objects */
+	unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
+	unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
+	unsigned int sp = f_gl_genprogram_g(vert, frag);
+	f_gl_detachprogshaders(sp);
+
+	glUseProgram(sp);
+
+	/* strange issues with clipping when offsetting z */
+	float transform[] = {
+		0.6f, 0.0f, 0.0f, 0.4f,
+		0.0f, 0.6f, 0.0f, 0.3f,
+		0.0f, 0.0f, 0.6f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	int transformloc = glGetUniformLocation(sp, "transform");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
+
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	/* xyz coordinates, rgb colors, texture coordinates  */
+	float vertices[] = {
+		 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
+		 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+		 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+		-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+	};
+
+	/* Index data for rendering as triangle strip */
+	unsigned int indices[] = {
+		0, 1, 2, 3, 0, 1
+	};
+
+	/* 4x4 RGB pixel data */
+	float pixels[] = {
+		0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+		0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+	};
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_FLOAT, pixels);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
+
+
 	/* Enable right handed (sensible) z axis when rendering */
 	glDepthRange(1, 0);
 	glEnable(GL_DEPTH_TEST);
@@ -284,59 +302,15 @@ void f_render_loop(void) {
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
 	} while(ws.runstate);
-}
-
-/* Assign data to already bound OpenGL objects */
-void f_render_init(void) {
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_FLOAT, pixels);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
-
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
-
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
-}
-
-/* Main function wrapped around glfw initalization and window creation */
-void f_render_main(void) {
-	/* Generate and bind objects */
-	f_gl_prog_create();
-
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_2D, texobj);
-
-	f_render_init();
-	f_render_loop();
 
 	/* Cleanup */
 	glDeleteTextures(1, &texobj);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
-	f_gl_prog_destroy();
+	glDeleteProgram(sp);
+	glDeleteShader(vert);
+	glDeleteShader(frag);
 }
 
 
