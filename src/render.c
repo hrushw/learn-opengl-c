@@ -186,9 +186,9 @@ float transform[] = {
 /* xyz coordinates, rgb colors, texture coordinates  */
 float vertices[] = {
 	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
-	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 2.0f,
-	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    2.0f, 0.0f,
-	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    2.0f, 2.0f
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
 };
 
 /* Index data for rendering as triangle strip */
@@ -210,17 +210,17 @@ float pixels[] = {
 
 enum e_proghandlemethod { PROG_GEN, PROG_CR, PROG_DEL, PROG_USE, PROG_UNIUP };
 
-/* This function handles generation, data and cleanup of shaders and the shader program.       *
- * The wrapper functions only print the error message on failure, but still return the         *
+/* This function handles generation, data and cleanup of shaders and the shader program. *
+ * The wrapper functions only print the error message on failure, but still return the *
  * created shader/program object rather than destroying them, leaving cleanup to this function */
 
 /* when this function is called with PROG_GEN, previously created objects are  *
- * deleted automatically regardless of compilation errors.                     */
+ * deleted automatically regardless of compilation errors. */
 
+/* all invocations of this function are with arguments known at compile time */
 void proghandler(enum e_proghandlemethod method) {
 	static unsigned int sp = 0;
-	static unsigned int vert = 0;
-	static unsigned int frag = 0;
+	static unsigned int vert = 0, frag = 0;
 	static int transformloc = 0;
 
 	switch(method) {
@@ -273,32 +273,6 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	q->start = 0, q->end = 0;
 }
 
-void rotate3dfx(float pos[3], float out[3], double angle) {
-	out[0] = pos[0];
-	out[1] = pos[1]*cos(angle) + pos[2]*sin(angle);
-	out[2] = - pos[1]*sin(angle) + pos[2]*cos(angle);
-}
-
-void rotate3dfy(float pos[3], float out[3], double angle) {
-	out[1] = pos[1];
-	out[2] = pos[2]*cos(angle) + pos[0]*sin(angle);
-	out[0] = - pos[2]*sin(angle) + pos[0]*cos(angle);
-}
-
-void rotate3dfz(float pos[3], float out[3], double angle) {
-	out[2] = pos[2];
-	out[0] = pos[0]*cos(angle) + pos[1]*sin(angle);
-	out[1] = - pos[0]*sin(angle) + pos[1]*cos(angle);
-}
-
-void rotate3df(float pos[3], float out[3], double anglex, double angley, double anglez) {
-	float tmp[3] = {0};
-	rotate3dfx(pos, out, anglex);
-	rotate3dfy(out, tmp, angley);
-	rotate3dfz(tmp, out, anglez);
-}
-
-
 /* Basic initialization and main render loop */
 void f_render_loop(void) {
 	/* Enable right handed (sensible) z axis when rendering */
@@ -308,9 +282,6 @@ void f_render_loop(void) {
 	/* Culling overrides the depth test ??? */
 	// glEnable(GL_CULL_FACE);
 	// glCullFace(GL_BACK);
-
-	/* Map buffer */
-	float* vrot = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 
 	/* Initialize time and loop */
 	double t0 = 0, dt = 0;
@@ -329,14 +300,7 @@ void f_render_loop(void) {
 		/* Other computations */
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
-
-		/* Rotate */
-		for(int i = 0; i < 4; ++i)
-			rotate3df(vertices + 8*i, vrot + 8*i, ws.time, 0.2*ws.time, 0);
 	} while(ws.runstate);
-
-	/* Unmap buffer */
-	glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
 /* Assign data to already bound OpenGL objects */
