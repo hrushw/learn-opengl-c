@@ -205,16 +205,48 @@ float pixels[] = {
 };
 
 
+struct t_gl_shaderdata {
+	unsigned int sp;
+	unsigned int vert, frag;
+};
+
+struct t_gl_shaderdata g_shd = {0, 0, 0};
+
+void f_gl_prog_create(void) {
+	static int transformloc = 0;
+
+	g_shd.vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
+	g_shd.frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
+	g_shd.sp = f_gl_genprogram_g(g_shd.vert, g_shd.frag);
+	f_gl_detachprogshaders(g_shd.sp);
+
+	glUseProgram(g_shd.sp);
+	transformloc = glGetUniformLocation(g_shd.sp, "transform");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
+}
+
+void f_gl_prog_destroy(void) {
+	glDeleteProgram(g_shd.sp);
+	glDeleteShader(g_shd.vert);
+	glDeleteShader(g_shd.frag);
+}
+
+void f_gl_prog_regen(void) {
+	f_gl_prog_create();
+	f_gl_prog_destroy();
+}
+
 static inline void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
 
 
-/* Evaluate keyboard and mouse events */
+/* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct t_glfw_inputqueue *q) {
 	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
-		// if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
-		// 	f_gl_prog_regen();
+		if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
+			f_gl_prog_regen();
 		if(q->queue[i].key == GLFW_KEY_T && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
 			glfwSetTime(0.0), ws.time = 0;
 		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && q->queue[i].action == GLFW_RELEASE )
@@ -278,19 +310,7 @@ void f_render_init(void) {
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void) {
 	/* Generate and bind objects */
-	unsigned int vert, frag;
-	vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
-	frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
-
-	unsigned int sp;
-	sp = f_gl_genprogram_g(vert, frag);
-
-	f_gl_detachprogshaders(sp);
-
-	glUseProgram(sp);
-	int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
+	f_gl_prog_create();
 
 	unsigned int VAO;
 	glGenVertexArrays(1, &VAO);
@@ -316,10 +336,7 @@ void f_render_main(void) {
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
-
-	glDeleteProgram(sp);
-	glDeleteShader(vert);
-	glDeleteShader(frag);
+	f_gl_prog_destroy();
 }
 
 
