@@ -20,13 +20,11 @@ struct t_glfw_inputqueue {
 };
 
 /* Global structure for the purpose of being modified by GLFW callback functions */
-/* win is required for swapping buffers */
 struct t_glfw_winstate {
 	int width, height;
 	/* Mouse x, y position */
 	double mx, my;
 	double time;
-	/* Queue of keypresses to evaluate at once */
 	struct t_glfw_inputqueue iq;
 	int szrefresh;
 	int runstate;
@@ -41,18 +39,17 @@ struct t_glfw_winstate ws = {
 	.runstate = 1,
 	.iq = {
 		.start = 0, .end = 0,
-		.queue = {{0}}
+		.queue = {{}}
 	},
 };
-/* TODO: eventually enable using multiple windows? */
 char g_charbuf[CHBUFSZ_] = {0};
 
 
 /* Append to queue - bounds check merged with function */
 void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
 	/* Bounds check for queue just in case */
-	/* iqstart must be bounded to [0, IQSZ_-1], while iqend must be bounded to [0, 2*IQSZ_-1] */
-	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_) {
+	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
+	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_ || q->start > q->end ) {
 		/* If bounds check fails, log error and reset the queue */
 		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
 		q->start = 0, q->end = 0;
@@ -87,8 +84,7 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	l = 0;
 
 	/* Always return null-terminated string */
-	finish:
-	buf[l] = 0;
+	finish: buf[l] = 0;
 	if(len) *len = l;
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 	return;
@@ -116,7 +112,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charb
 	unsigned int s = glCreateShader(type);
 	int len = 0;
 	f_io_filetobuf(path, &len, charbuf, charbufsz);
-	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);;
+	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);
 	glCompileShader(s);
 	f_gl_chkcmp(s, charbuf, charbufsz);
 	return s;
@@ -137,6 +133,7 @@ void f_gl_chklink(unsigned int sp, char *infolog, int il_len) {
 	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
+/* Generate shader program from given vertex and fragment shaders */
 unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsigned int frag) {
 	unsigned int sp = glCreateProgram();
 
@@ -166,7 +163,6 @@ void f_gl_viewportfitcenter(int width, int height) {
 static inline void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
-
 
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
 void evalqueue(struct t_glfw_inputqueue *q) {
@@ -221,6 +217,10 @@ void f_render_main(void* win) {
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
+
+	glDeleteShader(vert);
+	glDeleteShader(frag);
+
 	glUseProgram(sp);
 
 	unsigned int VAO;
@@ -263,7 +263,6 @@ void f_render_main(void* win) {
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
 
-	/* Enable right handed (sensible) z axis when rendering */
 	glDepthRange(1, 0);
 	glEnable(GL_DEPTH_TEST);
 
@@ -276,7 +275,7 @@ void f_render_main(void* win) {
 	do {
 		static double t0 = 0, dt = 0;
 		/* Set viewport and clear screen before drawing */
-		ws.szrefresh ? f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0 : 0;
+		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
@@ -302,8 +301,6 @@ void f_render_main(void* win) {
 	glDeleteBuffers(1, &EBO);
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteProgram(sp);
-	glDeleteShader(vert);
-	glDeleteShader(frag);
 }
 
 
