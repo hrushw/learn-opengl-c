@@ -229,10 +229,10 @@ struct mat4x4f rotatex(double angle) {
 
 struct mat4x4f rotatey(double angle) {
 	return (struct mat4x4f) {{
-		{  cos(angle), 0.0, sin(angle), 0.0 },
-		{         0.0, 1.0,        0.0, 0.0 },
-		{ -sin(angle), 0.0, cos(angle), 0.0 },
-		{         0.0, 0.0,        0.0, 1.0 },
+		{ cos(angle), 0.0, -sin(angle), 0.0 },
+		{        0.0, 1.0,        0.0, 0.0 },
+		{ sin(angle), 0.0,  cos(angle), 0.0 },
+		{        0.0, 0.0,        0.0, 1.0 },
 	}};
 }
 
@@ -250,6 +250,21 @@ struct mat4x4f multiply(struct mat4x4f a, struct mat4x4f b) {
 	for(int i = 0; i < 4; ++i) for(int j = 0; j < 4; ++j) for(int k = 0; k < 4; ++k)
 		out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
 	return out;
+}
+
+struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
+	switch(n) {
+		case 0:
+			return c_mat4x4f_identity;
+		case 1:
+			return m[0];
+		case 2:
+			return multiply(m[0], m[1]);
+		default:
+			struct mat4x4f m1 = multiplylist(m, n/2);
+			struct mat4x4f m2 = multiplylist(m + n/2, n/2 + n%2);
+			return multiply(m1, m2);
+	}
 }
 
 /* Main function wrapped around glfw initalization and window creation */
@@ -278,18 +293,19 @@ void f_render_main(void* win) {
 	/* strange issues with clipping when offsetting z */
 	struct mat4x4f transform = multiply(translate(0.4f, 0.1f, 0.0f), c_mat4x4f_identity);
 
-
 	/* Generate and bind objects */
-	unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
-	unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
-	unsigned int sp = f_gl_genprogram_g(vert, frag);
+	unsigned int sp;
+	{
+		unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
+		unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
+		sp = f_gl_genprogram_g(vert, frag);
 
-	glDetachShader(sp, vert);
-	glDetachShader(sp, frag);
+		glDetachShader(sp, vert);
+		glDetachShader(sp, frag);
 
-	glDeleteShader(vert);
-	glDeleteShader(frag);
-
+		glDeleteShader(vert);
+		glDeleteShader(frag);
+	}
 	glUseProgram(sp);
 
 	unsigned int VAO;
@@ -339,7 +355,7 @@ void f_render_main(void* win) {
 	// glCullFace(GL_BACK);
 
 	/* Initialize time and loop */
-	glfwSetTime(0);
+	glfwSetTime(0.0);
 	do {
 		static double t0 = 0, dt = 0;
 		/* Set viewport and clear screen before drawing */
@@ -357,7 +373,15 @@ void f_render_main(void* win) {
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
 
-		transform = multiply(multiply(translate(0.4f, 0.1f, 0.0f), scale(0.5f)), multiply(rotatex(ws.time), rotatey(ws.time)));
+		{
+			struct mat4x4f arr[] = {
+				translate(0.4f, 0.1f, 0.0f),
+				scale(0.5f),
+				rotatex(ws.time),
+				rotatey(ws.time),
+			};
+			transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
+		}
 	} while(ws.runstate);
 
 	/* Cleanup */
