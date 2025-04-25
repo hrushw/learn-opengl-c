@@ -22,7 +22,6 @@ struct t_glfw_inputqueue {
 /* Global structure for the purpose of being modified by GLFW callback functions */
 /* win is required for swapping buffers */
 struct t_glfw_winstate {
-	void* win;
 	int width, height;
 	/* Mouse x, y position */
 	double mx, my;
@@ -35,7 +34,6 @@ struct t_glfw_winstate {
 
 /* Window state - global structure */
 struct t_glfw_winstate ws = {
-	.win = NULL,
 	.width = 0, .height = 0,
 	.mx = 0, .my = 0,
 	.time = 0,
@@ -185,7 +183,7 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 }
 
 /* Main function wrapped around glfw initalization and window creation */
-void f_render_main(void) {
+void f_render_main(void* win) {
 	/* xyz coordinates, rgb colors, texture coordinates  */
 	float vertices[] = {
 		 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
@@ -241,8 +239,7 @@ void f_render_main(void) {
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
-	int transformloc;
-	transformloc = glGetUniformLocation(sp, "transform");
+	int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
 	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
 
@@ -286,7 +283,7 @@ void f_render_main(void) {
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
-		glfwSwapBuffers(ws.win);
+		glfwSwapBuffers(win);
 		glfwPollEvents();
 
 		/* Other computations */
@@ -395,15 +392,16 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	void* win = f_glfw_crwin(title, width, height, WIN_DEF);
 	if(!win) return NULL;
 
+	/* Setup callback functions */
 	glfwSetKeyCallback(win, f_glfw_callback_key);
 	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
 	glfwSetMouseButtonCallback(win, f_glfw_callback_mouseclick);
 	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
-	glfwMakeContextCurrent(win);
-	gladLoadGL(glfwGetProcAddress);
-	glfwSwapInterval(1);
+	glfwMakeContextCurrent(win); // Setup OpenGL context
+	gladLoadGL(glfwGetProcAddress); // Load functions from above context
+	glfwSwapInterval(1); // calls to glfwSwapBuffers() will only cause swap once per frame
 	return win;
 }
 
@@ -411,12 +409,14 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
-	if(!(ws.win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
-	glfwGetFramebufferSize(ws.win, &ws.width, &ws.height);
 
-	f_render_main();
+	void* win;
+	if(!(win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
+	glfwGetFramebufferSize(win, &ws.width, &ws.height);
 
-	glfwDestroyWindow(ws.win);
+	f_render_main(win);
+
+	glfwDestroyWindow(win);
 	end: glfwTerminate();
 	return 0;
 }
