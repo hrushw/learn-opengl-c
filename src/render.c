@@ -178,6 +178,80 @@ void evalqueue(struct t_glfw_inputqueue *q) {
 	q->start = 0, q->end = 0;
 }
 
+struct mat4x4f {
+	float arr[4][4];
+};
+
+const struct mat4x4f c_mat4x4f_identity = {{
+	{ 1.0, 0.0, 0.0, 0.0 },
+	{ 0.0, 1.0, 0.0, 0.0 },
+	{ 0.0, 0.0, 1.0, 0.0 },
+	{ 0.0, 0.0, 0.0, 1.0 },
+}};
+
+const struct mat4x4f c_mat4x4f_zero = {{
+	{ 0.0, 0.0, 0.0, 0.0 },
+	{ 0.0, 0.0, 0.0, 0.0 },
+	{ 0.0, 0.0, 0.0, 0.0 },
+	{ 0.0, 0.0, 0.0, 0.0 },
+}};
+
+struct mat4x4f scale3d(float x, float y, float z) {
+	return (struct mat4x4f){{
+		{   x, 0.0, 0.0, 0.0 },
+		{ 0.0,   y, 0.0, 0.0 },
+		{ 0.0, 0.0,   z, 0.0 },
+		{ 0.0, 0.0, 0.0, 1.0 },
+	}};
+}
+
+static inline struct mat4x4f scale(float s) {
+	return scale3d(s, s, s);
+}
+
+struct mat4x4f translate(float x, float y, float z) {
+	return (struct mat4x4f){{
+		{ 1.0, 0.0, 0.0,   x },
+		{ 0.0, 1.0, 0.0,   y },
+		{ 0.0, 0.0, 1.0,   z },
+		{ 0.0, 0.0, 0.0, 1.0 },
+	}};
+}
+
+struct mat4x4f rotatex(double angle) {
+	return (struct mat4x4f) {{
+		{ 1.0,         0.0,        0.0, 0.0 },
+		{ 0.0,  cos(angle), sin(angle), 0.0 },
+		{ 0.0, -sin(angle), cos(angle), 0.0 },
+		{ 0.0,         0.0,        0.0, 1.0 },
+	}};
+}
+
+struct mat4x4f rotatey(double angle) {
+	return (struct mat4x4f) {{
+		{  cos(angle), 0.0, sin(angle), 0.0 },
+		{         0.0, 1.0,        0.0, 0.0 },
+		{ -sin(angle), 0.0, cos(angle), 0.0 },
+		{         0.0, 0.0,        0.0, 1.0 },
+	}};
+}
+
+struct mat4x4f rotatez(double angle) {
+	return (struct mat4x4f) {{
+		{  cos(angle), sin(angle), 0.0, 0.0 },
+		{ -sin(angle), cos(angle), 0.0, 0.0 },
+		{         0.0,        0.0, 1.0, 0.0 },
+		{         0.0,        0.0, 0.0, 1.0 },
+	}};
+}
+
+struct mat4x4f multiply(struct mat4x4f a, struct mat4x4f b) {
+	struct mat4x4f out = c_mat4x4f_zero;
+	for(int i = 0; i < 4; ++i) for(int j = 0; j < 4; ++j) for(int k = 0; k < 4; ++k)
+		out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
+	return out;
+}
+
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
 	/* xyz coordinates, rgb colors, texture coordinates  */
@@ -202,12 +276,7 @@ void f_render_main(void* win) {
 	};
 
 	/* strange issues with clipping when offsetting z */
-	float transform[] = {
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
+	struct mat4x4f transform = multiply(translate(0.4f, 0.1f, 0.0f), c_mat4x4f_identity);
 
 
 	/* Generate and bind objects */
@@ -241,11 +310,10 @@ void f_render_main(void* win) {
 
 	int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
-	else glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
 
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_DYNAMIC_DRAW);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -278,7 +346,7 @@ void f_render_main(void* win) {
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUniformMatrix4fv(transformloc, 1, GL_TRUE, transform);
+		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		/* GLFW window handling */
@@ -289,10 +357,7 @@ void f_render_main(void* win) {
 		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
 
-		transform[0] = cos(ws.time);
-		transform[2] = sin(ws.time);
-		transform[8] = -sin(ws.time);
-		transform[10] = cos(ws.time);
+		transform = multiply(multiply(translate(0.4f, 0.1f, 0.0f), scale(0.5f)), multiply(rotatex(ws.time), rotatey(ws.time)));
 	} while(ws.runstate);
 
 	/* Cleanup */
