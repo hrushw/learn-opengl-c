@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 
-enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 1 << 16 };
+enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 0x10000 };
 
 /* Keypress struct - don't care about scancode or window */
 struct t_glfw_inputevent {
@@ -39,11 +39,9 @@ struct t_glfw_winstate ws = {
 	.runstate = 1,
 	.iq = {
 		.start = 0, .end = 0,
-		.queue = {{}}
+		.queue = {{0}}
 	},
 };
-char g_charbuf[CHBUFSZ_] = {0};
-
 
 /* Append to queue - bounds check merged with function */
 void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
@@ -94,9 +92,11 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 
 /* Check if shader was compiled successfully */
 void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
-	int success = 0;
-	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
-	if(success) return;
+	{
+		int success = 0;
+		glGetShaderiv(s, GL_COMPILE_STATUS, &success);
+		if(success) return;
+	}
 
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
@@ -108,50 +108,50 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 }
 
 /* Generate shader from file path - general function */
-unsigned int f_gl_genshader(const char* path, int type, char* charbuf, int charbufsz) {
-	unsigned int s = glCreateShader(type);
+unsigned int f_gl_genshader(const char* path, int type) {
+	char chbuf[CHBUFSZ_];
 	int len = 0;
-	f_io_filetobuf(path, &len, charbuf, charbufsz);
-	glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);
+	f_io_filetobuf(path, &len, chbuf, CHBUFSZ_);
+
+	unsigned int s = glCreateShader(type);
+	{
+		char* charbuf = chbuf;
+		glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);
+	}
 	glCompileShader(s);
-	f_gl_chkcmp(s, charbuf, charbufsz);
+
+	f_gl_chkcmp(s, chbuf, CHBUFSZ_);
 	return s;
 }
 
 /* Check if program was linked successfully */
-void f_gl_chklink(unsigned int sp, char *infolog, int il_len) {
-	int success = 0;
-	glGetProgramiv(sp, GL_LINK_STATUS, &success);
-	if(success) return;
+void f_gl_chklink(unsigned int sp) {
+	{
+		int success = 0;
+		glGetProgramiv(sp, GL_LINK_STATUS, &success);
+		if(success) return;
+	}
 
+	char chbuf[CHBUFSZ_];
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-	if(gl_il_len > il_len)
-		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
-	glGetProgramInfoLog(sp, il_len, NULL, infolog);
-	infolog[il_len-1] = 0;
-	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
+	if(gl_il_len > CHBUFSZ_)
+		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, CHBUFSZ_);
+	glGetProgramInfoLog(sp, CHBUFSZ_, NULL, chbuf);
+	chbuf[CHBUFSZ_-1] = 0;
+	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", chbuf);
 }
 
 /* Generate shader program from given vertex and fragment shaders */
-unsigned int f_gl_genprogram(char* infolog, int il_len, unsigned int vert, unsigned int frag) {
+unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag) {
 	unsigned int sp = glCreateProgram();
 
 	glAttachShader(sp, vert);
 	glAttachShader(sp, frag);
 
 	glLinkProgram(sp);
-	f_gl_chklink(sp, infolog, il_len);
+	f_gl_chklink(sp);
 	return sp;
-}
-
-/* Wrappers for shader and program generation functions using global character buffer */
-static inline unsigned int f_gl_genshader_g(const char* path, int type) {
-	return f_gl_genshader(path, type, g_charbuf, CHBUFSZ_);
-}
-
-static inline unsigned int f_gl_genprogram_g(unsigned int vert, unsigned int frag) {
-	return f_gl_genprogram(g_charbuf, CHBUFSZ_, vert, frag);
 }
 
 /* center and 1:1 the OpenGL viewport (perhaps there is a better way of maintaining aspect ratio) */
@@ -253,6 +253,8 @@ struct mat4x4f multiply(struct mat4x4f a, struct mat4x4f b) {
 }
 
 struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
+	struct mat4x4f m1;
+	struct mat4x4f m2;
 	switch(n) {
 		case 0:
 			return c_mat4x4f_identity;
@@ -261,8 +263,8 @@ struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
 		case 2:
 			return multiply(m[0], m[1]);
 		default:
-			struct mat4x4f m1 = multiplylist(m, n/2);
-			struct mat4x4f m2 = multiplylist(m + n/2, n/2 + n%2);
+			m1 = multiplylist(m, n/2);
+			m2 = multiplylist(m + n/2, n/2 + n%2);
 			return multiply(m1, m2);
 	}
 }
@@ -296,9 +298,9 @@ void f_render_main(void* win) {
 	/* Generate and bind objects */
 	unsigned int sp;
 	{
-		unsigned int vert = f_gl_genshader_g("vertex.glsl", GL_VERTEX_SHADER);
-		unsigned int frag = f_gl_genshader_g("fragment.glsl", GL_FRAGMENT_SHADER);
-		sp = f_gl_genprogram_g(vert, frag);
+		unsigned int vert = f_gl_genshader("vertex.glsl", GL_VERTEX_SHADER);
+		unsigned int frag = f_gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER);
+		sp = f_gl_genprogram(vert, frag);
 
 		glDetachShader(sp, vert);
 		glDetachShader(sp, frag);
@@ -375,10 +377,11 @@ void f_render_main(void* win) {
 
 		{
 			struct mat4x4f arr[] = {
+				rotatez(ws.time),
 				translate(0.4f, 0.1f, 0.0f),
 				scale(0.5f),
-				rotatex(ws.time),
-				rotatey(ws.time),
+				rotatez(-ws.time),
+				rotatey(3*ws.time),
 			};
 			transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
 		}

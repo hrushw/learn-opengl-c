@@ -1,4 +1,4 @@
-CC = gcc -Wall -Wextra -Wpedantic -Wvla
+CC = clang -Wall -Wextra -Wpedantic -Wvla
 INC = -I ./include
 
 render: obj/render.o obj/gl.o
