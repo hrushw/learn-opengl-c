@@ -220,28 +220,28 @@ struct mat4x4f translate(float x, float y, float z) {
 
 struct mat4x4f rotatex(double angle) {
 	return (struct mat4x4f) {{
-		{ 1.0,         0.0,        0.0, 0.0 },
-		{ 0.0,  cos(angle), sin(angle), 0.0 },
-		{ 0.0, -sin(angle), cos(angle), 0.0 },
-		{ 0.0,         0.0,        0.0, 1.0 },
+		{ 1.0,        0.0,         0.0, 0.0 },
+		{ 0.0, cos(angle), -sin(angle), 0.0 },
+		{ 0.0, sin(angle),  cos(angle), 0.0 },
+		{ 0.0,        0.0,         0.0, 1.0 },
 	}};
 }
 
 struct mat4x4f rotatey(double angle) {
 	return (struct mat4x4f) {{
-		{ cos(angle), 0.0, -sin(angle), 0.0 },
-		{        0.0, 1.0,        0.0, 0.0 },
-		{ sin(angle), 0.0,  cos(angle), 0.0 },
-		{        0.0, 0.0,        0.0, 1.0 },
+		{  cos(angle), 0.0, sin(angle), 0.0 },
+		{         0.0, 1.0,       0.0, 0.0 },
+		{ -sin(angle), 0.0, cos(angle), 0.0 },
+		{         0.0, 0.0,       0.0, 1.0 },
 	}};
 }
 
 struct mat4x4f rotatez(double angle) {
 	return (struct mat4x4f) {{
-		{  cos(angle), sin(angle), 0.0, 0.0 },
-		{ -sin(angle), cos(angle), 0.0, 0.0 },
-		{         0.0,        0.0, 1.0, 0.0 },
-		{         0.0,        0.0, 0.0, 1.0 },
+		{ cos(angle), -sin(angle), 0.0, 0.0 },
+		{ sin(angle),  cos(angle), 0.0, 0.0 },
+		{        0.0,         0.0, 1.0, 0.0 },
+		{        0.0,         0.0, 0.0, 1.0 },
 	}};
 }
 
