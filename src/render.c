@@ -92,11 +92,9 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 
 /* Check if shader was compiled successfully */
 void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
-	{
-		int success = 0;
-		glGetShaderiv(s, GL_COMPILE_STATUS, &success);
-		if(success) return;
-	}
+	int success = 0;
+	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
+	if(success) return;
 
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
@@ -108,49 +106,43 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 }
 
 /* Generate shader from file path - general function */
-unsigned int f_gl_genshader(const char* path, int type) {
-	char chbuf[CHBUFSZ_];
+unsigned int f_gl_genshader(const char* path, int type, char* chbuf, int chbufsz) {
 	int len = 0;
-	f_io_filetobuf(path, &len, chbuf, CHBUFSZ_);
+	f_io_filetobuf(path, &len, chbuf, chbufsz);
 
 	unsigned int s = glCreateShader(type);
-	{
-		char* charbuf = chbuf;
-		glShaderSource(s, 1, (const char* const*)(&charbuf), NULL);
-	}
+	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
 	glCompileShader(s);
 
-	f_gl_chkcmp(s, chbuf, CHBUFSZ_);
+	f_gl_chkcmp(s, chbuf, chbufsz);
 	return s;
 }
 
 /* Check if program was linked successfully */
-void f_gl_chklink(unsigned int sp) {
-	{
-		int success = 0;
-		glGetProgramiv(sp, GL_LINK_STATUS, &success);
-		if(success) return;
-	}
+void f_gl_chklink(unsigned int sp, char* infolog, int il_len) {
+	int success = 0;
+	glGetProgramiv(sp, GL_LINK_STATUS, &success);
+	if(success) return;
 
-	char chbuf[CHBUFSZ_];
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-	if(gl_il_len > CHBUFSZ_)
-		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, CHBUFSZ_);
-	glGetProgramInfoLog(sp, CHBUFSZ_, NULL, chbuf);
-	chbuf[CHBUFSZ_-1] = 0;
-	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", chbuf);
+	if(gl_il_len > il_len)
+		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+	glGetProgramInfoLog(sp, il_len, NULL, infolog);
+	infolog[il_len-1] = 0;
+	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
 }
 
 /* Generate shader program from given vertex and fragment shaders */
-unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag) {
+unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, int chbufsz) {
 	unsigned int sp = glCreateProgram();
 
 	glAttachShader(sp, vert);
 	glAttachShader(sp, frag);
 
 	glLinkProgram(sp);
-	f_gl_chklink(sp);
+
+	f_gl_chklink(sp, chbuf, chbufsz);
 	return sp;
 }
 
@@ -295,12 +287,12 @@ void f_render_main(void* win) {
 	/* strange issues with clipping when offsetting z */
 	struct mat4x4f transform = multiply(translate(0.4f, 0.1f, 0.0f), c_mat4x4f_identity);
 
-	/* Generate and bind objects */
 	unsigned int sp;
 	{
-		unsigned int vert = f_gl_genshader("vertex.glsl", GL_VERTEX_SHADER);
-		unsigned int frag = f_gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER);
-		sp = f_gl_genprogram(vert, frag);
+		static char chbuf[CHBUFSZ_];
+		unsigned int vert = f_gl_genshader("vertex.glsl", GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
+		unsigned int frag = f_gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
+		sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
 
 		glDetachShader(sp, vert);
 		glDetachShader(sp, frag);
@@ -310,6 +302,7 @@ void f_render_main(void* win) {
 	}
 	glUseProgram(sp);
 
+	/* Generate and bind objects */
 	unsigned int VAO;
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
