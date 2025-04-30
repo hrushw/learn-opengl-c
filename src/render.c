@@ -261,32 +261,30 @@ struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
 	}
 }
 
+/* xyz coordinates, rgb colors, texture coordinates  */
+const float vertices[] = {
+	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
+	 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+	 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+	-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+};
+
+/* Index data for rendering as triangle strip */
+const unsigned int indices[] = {
+	0, 1, 2, 3, 0, 1
+};
+
+/* 4x4 RGB pixel data */
+const float pixels[] = {
+	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
+	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
+};
+
+
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
-	/* xyz coordinates, rgb colors, texture coordinates  */
-	float vertices[] = {
-		 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
-		 0.0f, -0.2f, -0.8f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
-		 0.7f, -0.6f,  0.4f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-		-0.7f, -0.6f,  0.4f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f
-	};
-
-	/* Index data for rendering as triangle strip */
-	unsigned int indices[] = {
-		0, 1, 2, 3, 0, 1
-	};
-
-	/* 4x4 RGB pixel data */
-	float pixels[] = {
-		0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-		0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
-		0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
-	};
-
-	/* strange issues with clipping when offsetting z */
-	struct mat4x4f transform = multiply(translate(0.4f, 0.1f, 0.0f), c_mat4x4f_identity);
-
 	unsigned int sp;
 	{
 		static char chbuf[CHBUFSZ_];
@@ -351,8 +349,19 @@ void f_render_main(void* win) {
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
-	do {
-		static double t0 = 0, dt = 0;
+	for(double t0 = 0, dt = 0; ws.runstate; updatetime(&ws.time, &t0, &dt)) {
+		/* strange issues with clipping when offsetting z */
+		static struct mat4x4f transform = c_mat4x4f_zero;
+
+		struct mat4x4f arr[] = {
+			rotatez(ws.time),
+			translate(0.4f, 0.1f, 0.0f),
+			scale(0.5f),
+			rotatez(-ws.time),
+			rotatey(3*ws.time),
+		};
+		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
+
 		/* Set viewport and clear screen before drawing */
 		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -364,21 +373,8 @@ void f_render_main(void* win) {
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
-		/* Other computations */
-		updatetime(&ws.time, &t0, &dt);
 		evalqueue(&ws.iq);
-
-		{
-			struct mat4x4f arr[] = {
-				rotatez(ws.time),
-				translate(0.4f, 0.1f, 0.0f),
-				scale(0.5f),
-				rotatez(-ws.time),
-				rotatey(3*ws.time),
-			};
-			transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
-		}
-	} while(ws.runstate);
+	}
 
 	/* Cleanup */
 	glDeleteTextures(1, &texobj);
@@ -387,7 +383,6 @@ void f_render_main(void* win) {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteProgram(sp);
 }
-
 
 
 /* ----------------------- *
