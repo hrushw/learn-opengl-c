@@ -30,21 +30,8 @@ struct t_glfw_winstate {
 	int runstate;
 };
 
-/* Window state - global structure */
-struct t_glfw_winstate ws = {
-	.width = 0, .height = 0,
-	.mx = 0, .my = 0,
-	.time = 0,
-	.szrefresh = 1,
-	.runstate = 1,
-	.iq = {
-		.start = 0, .end = 0,
-		.queue = {{0}}
-	},
-};
-
 /* Append to queue - bounds check merged with function */
-void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, double mx, double my, double time) {
+void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
 	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_ || q->start > q->end ) {
@@ -53,11 +40,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, int key, int action, int mods, doub
 		q->start = 0, q->end = 0;
 	}
 
-	q->queue[q->end] = (struct t_glfw_inputevent) {
-		.key = key, .action = action, .mods = mods,
-		/* Mouse x,y coordinates and time are not rechecked in key callback function */
-		.mx = mx, .my = my, .time = time
-	};
+	q->queue[q->end] = ev;
 	q->end = (q->end + 1) % (2*IQSZ_);
 }
 
@@ -157,17 +140,18 @@ static inline void updatetime(double *time, double *t0, double *dt) {
 }
 
 /* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
-void evalqueue(struct t_glfw_inputqueue *q) {
-	for(int i = q->start; (i %= IQSZ_) != q->end; ++i) {
-		// if(q->queue[i].key == GLFW_KEY_R && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
+void f_render_evalstate(struct t_glfw_winstate *wst) {
+	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
+		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
+		// if(qev.key == GLFW_KEY_R && qev.mods == GLFW_MOD_CONTROL && qev.action == GLFW_RELEASE)
 		// 	f_gl_prog_destroy(), f_gl_prog_create();
-		if(q->queue[i].key == GLFW_KEY_T && q->queue[i].mods == GLFW_MOD_CONTROL && q->queue[i].action == GLFW_RELEASE)
-			glfwSetTime(0.0), ws.time = 0;
-		if(q->queue[i].key == GLFW_KEY_Q && q->queue[i].mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && q->queue[i].action == GLFW_RELEASE )
-			ws.runstate = 0;
+		if(qev->key == GLFW_KEY_T && qev->mods == GLFW_MOD_CONTROL && qev->action == GLFW_RELEASE)
+			glfwSetTime(0.0), wst->time = 0;
+		if(qev->key == GLFW_KEY_Q && qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && qev->action == GLFW_RELEASE )
+			wst->runstate = 0;
 	}
 	/* Reset queue after evaluation */
-	q->start = 0, q->end = 0;
+	wst->iq.start = 0, wst->iq.end = 0;
 }
 
 struct mat4x4f {
@@ -285,6 +269,8 @@ const float pixels[] = {
 
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(win);
+
 	unsigned int sp;
 	{
 		static char chbuf[CHBUFSZ_];
@@ -349,21 +335,21 @@ void f_render_main(void* win) {
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
-	for(double t0 = 0, dt = 0; ws.runstate; updatetime(&ws.time, &t0, &dt)) {
+	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		/* strange issues with clipping when offsetting z */
 		static struct mat4x4f transform = c_mat4x4f_zero;
 
 		struct mat4x4f arr[] = {
-			rotatez(ws.time),
+			rotatez(wst->time),
 			translate(0.4f, 0.1f, 0.0f),
 			scale(0.5f),
-			rotatez(-ws.time),
-			rotatey(3*ws.time),
+			rotatez(-wst->time),
+			rotatey(3*wst->time),
 		};
 		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
 
 		/* Set viewport and clear screen before drawing */
-		if(ws.szrefresh) f_gl_viewportfitcenter(ws.width, ws.height), ws.szrefresh = 0;
+		if(wst->szrefresh) f_gl_viewportfitcenter(wst->width, wst->height), wst->szrefresh = 0;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
@@ -373,7 +359,7 @@ void f_render_main(void* win) {
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
-		evalqueue(&ws.iq);
+		f_render_evalstate(wst);
 	}
 
 	/* Cleanup */
@@ -397,37 +383,35 @@ void f_glfw_callback_error(int err, const char* desc) {
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
 /* Additionally store mouse coordinates into queue */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
-	f_iqappend(&ws.iq, key, action, mods, ws.mx, ws.my, ws.time);
-	/* Window and scancode remain unused */
-	(void)window, (void)scancode;
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ key, action, mods, wst->mx, wst->my, wst->time });
+	/* Scancode remains unused */
+	(void)scancode;
 }
 
 /* Cursor position callback: simply update global mouse coordinates */
 void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
-	ws.mx = x, ws.my = y;
-	/* Window remains unused */
-	(void)window;
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	wst->mx = x, wst->my = y;
 }
 
 /* Mouse click callback: same as key callback */
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
-	f_iqappend(&ws.iq, button, action, mods, ws.mx, ws.my, ws.time);
-	/* Window remains unused */
-	(void)window;
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ button, action, mods, wst->mx, wst->my, wst->time });
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */
 void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
-	ws.width = width, ws.height = height, ws.szrefresh = 1;
-	/* Window remains unused */
-	(void)window;
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	wst->width = width, wst->height = height, wst->szrefresh = 1;
 }
 
 /* Callback for window close event */
 void f_glfw_callback_winclose(GLFWwindow *window) {
-	ws.runstate = 0;
-	(void)window;
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	wst->runstate = 0;
 }
 
 
@@ -488,8 +472,21 @@ int main(void) {
 	if(!glfwInit()) return -1;
 
 	void* win;
+	static struct t_glfw_winstate ws = {
+		.width = 0, .height = 0,
+		.mx = 0, .my = 0,
+		.time = 0,
+		.szrefresh = 1,
+		.runstate = 1,
+		.iq = {
+			.start = 0, .end = 0,
+			.queue = {{0}}
+		},
+	};
+
 	if(!(win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
 	glfwGetFramebufferSize(win, &ws.width, &ws.height);
+	glfwSetWindowUserPointer(win, &ws);
 
 	f_render_main(win);
 
