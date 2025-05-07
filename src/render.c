@@ -129,12 +129,6 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, 
 	return sp;
 }
 
-/* center and 1:1 the OpenGL viewport (perhaps there is a better way of maintaining aspect ratio) */
-void f_gl_viewportfitcenter(int width, int height) {
-	int pad = width > height ? (width - height) / 2 : (height - width) / 2;
-	width > height ? glViewport(pad, 0, height, height) : glViewport(0, pad, width, width);
-}
-
 static inline void updatetime(double *time, double *t0, double *dt) {
 	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
 }
@@ -304,7 +298,9 @@ void f_render_main(void* win) {
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
 	int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get uniform location!\n");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
+	int scaleloc = glGetUniformLocation(sp, "scale");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'scale'!\n");
 
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
@@ -336,10 +332,10 @@ void f_render_main(void* win) {
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
-		/* strange issues with clipping when offsetting z */
 		static struct mat4x4f transform = c_mat4x4f_zero;
 
 		struct mat4x4f arr[] = {
+			translate(0.6f, 0, 0),
 			rotatez(wst->time),
 			translate(0.4f, 0.1f, 0.0f),
 			scale(0.5f),
@@ -348,9 +344,16 @@ void f_render_main(void* win) {
 		};
 		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
 
-		/* Set viewport and clear screen before drawing */
-		if(wst->szrefresh) f_gl_viewportfitcenter(wst->width, wst->height), wst->szrefresh = 0;
+		/* Clear screen before drawing */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		/* Set viewport */
+		if(wst->szrefresh) {
+			wst->szrefresh = 0;
+			glViewport(0, 0, wst->width, wst->height);
+			if(wst->width > wst->height) glUniform2f(scaleloc, (double)wst->width / (double)wst->height, 1.0f);
+			else glUniform2f(scaleloc, 1.0f, (double)wst->height / (double)wst->width);
+		}
 
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
