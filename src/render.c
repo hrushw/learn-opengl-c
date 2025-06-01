@@ -5,6 +5,15 @@
 #include <stdio.h>
 #include <math.h>
 
+/* References
+ * OpenGL Tutorials (Victor Gordan) - https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-
+ * OpenGL for Beginners (OGLDEV) - https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA
+
+ * OpenGL 4.6 specification - https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf
+ * GLFW documentation [window guide] - https://www.glfw.org/docs/latest/window_guide.html
+ * OpenGL wiki [Rendering Pipeline Overview] - https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview
+ */
+
 enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 0x10000 };
 
 /* Keypress struct - don't care about scancode or window */
@@ -67,7 +76,8 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	/* Always return null-terminated string */
 	finish: buf[l] = 0;
 	if(len) *len = l;
-	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
+	if(fclose(f))
+		fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 	return;
 
 	failopen: fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
@@ -189,29 +199,45 @@ struct mat4x4f translate(float x, float y, float z) {
 }
 
 struct mat4x4f rotatex(double angle) {
+	float c = cos(angle);
+	float s = sin(angle);
 	return (struct mat4x4f) {{
-		{ 1.0,        0.0,         0.0, 0.0 },
-		{ 0.0, cos(angle), -sin(angle), 0.0 },
-		{ 0.0, sin(angle),  cos(angle), 0.0 },
-		{ 0.0,        0.0,         0.0, 1.0 },
+		{ 1.0, 0.0, 0.0, 0.0 },
+		{ 0.0,   c,  -s, 0.0 },
+		{ 0.0,   s,   c, 0.0 },
+		{ 0.0, 0.0, 0.0, 1.0 },
 	}};
 }
 
 struct mat4x4f rotatey(double angle) {
+	float c = cos(angle);
+	float s = sin(angle);
 	return (struct mat4x4f) {{
-		{  cos(angle), 0.0, sin(angle), 0.0 },
-		{         0.0, 1.0,       0.0, 0.0 },
-		{ -sin(angle), 0.0, cos(angle), 0.0 },
-		{         0.0, 0.0,       0.0, 1.0 },
+		{   c, 0.0,   s, 0.0 },
+		{ 0.0, 1.0, 0.0, 0.0 },
+		{  -s, 0.0,   c, 0.0 },
+		{ 0.0, 0.0, 0.0, 1.0 },
 	}};
 }
 
 struct mat4x4f rotatez(double angle) {
+	float c = cos(angle);
+	float s = sin(angle);
 	return (struct mat4x4f) {{
-		{ cos(angle), -sin(angle), 0.0, 0.0 },
-		{ sin(angle),  cos(angle), 0.0, 0.0 },
-		{        0.0,         0.0, 1.0, 0.0 },
-		{        0.0,         0.0, 0.0, 1.0 },
+		{   c,  -s, 0.0, 0.0 },
+		{   s,   c, 0.0, 0.0 },
+		{ 0.0, 0.0, 1.0, 0.0 },
+		{ 0.0, 0.0, 0.0, 1.0 },
+	}};
+}
+
+struct mat4x4f projection(double angle) {
+	float scale = 1.0/tanf(angle/2.0);
+	return (struct mat4x4f) {{
+		{ scale,   0.0, 0.0, 0.0 },
+		{   0.0, scale, 0.0, 0.0 },
+		{   0.0,   0.0, 1.0, 0.0 },
+		{   0.0,   0.0, 1.0, 0.0 },
 	}};
 }
 
@@ -223,8 +249,6 @@ struct mat4x4f multiply(struct mat4x4f a, struct mat4x4f b) {
 }
 
 struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
-	struct mat4x4f m1;
-	struct mat4x4f m2;
 	switch(n) {
 		case 0:
 			return c_mat4x4f_identity;
@@ -233,9 +257,10 @@ struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
 		case 2:
 			return multiply(m[0], m[1]);
 		default:
-			m1 = multiplylist(m, n/2);
-			m2 = multiplylist(m + n/2, n/2 + n%2);
-			return multiply(m1, m2);
+			return multiply(
+				multiplylist(m, n/2),
+				multiplylist(m + n/2, n/2 + n%2)
+			);
 	}
 }
 
@@ -252,6 +277,7 @@ const unsigned int indices[] = {
 	0, 1, 2, 3, 0, 1
 };
 
+
 /* 4x4 RGB pixel data */
 const float pixels[] = {
 	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
@@ -259,7 +285,6 @@ const float pixels[] = {
 	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
 	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 };
-
 
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
@@ -322,20 +347,26 @@ void f_render_main(void* win) {
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
 
-	glDepthRange(1, 0);
-	glEnable(GL_DEPTH_TEST);
+	// glDepthRange(1, 0);
+	// glEnable(GL_DEPTH_TEST);
+	// glDepthFunc(GL_LESS);
 
 	/* Culling overrides the depth test ??? */
-	// glEnable(GL_CULL_FACE);
-	// glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	glCullFace(GL_FRONT);
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		static struct mat4x4f transform = c_mat4x4f_zero;
 
+		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w *
+		 * However, the z value is also scaled down by w, and the projection matrix copies the z value into w,  *
+		 * so the depth test now no longer works as all z values are scaled to 1.0f */
 		struct mat4x4f arr[] = {
-			translate(0.6f, 0, 0),
+			projection(M_PI/3.0),
+			translate(0.6f, 0, 2.0f),
 			rotatez(wst->time),
 			translate(0.4f, 0.1f, 0.0f),
 			scale(0.5f),
@@ -351,10 +382,14 @@ void f_render_main(void* win) {
 		if(wst->szrefresh) {
 			wst->szrefresh = 0;
 			glViewport(0, 0, wst->width, wst->height);
-			if(wst->width > wst->height) glUniform2f(scaleloc, (double)wst->width / (double)wst->height, 1.0f);
-			else glUniform2f(scaleloc, 1.0f, (double)wst->height / (double)wst->width);
+			/* Give window scale information to vertex shader */
+			if(wst->width > wst->height)
+				glUniform2f(scaleloc, (double)wst->width / (double)wst->height, 1.0f);
+			else
+				glUniform2f(scaleloc, 1.0f, (double)wst->height / (double)wst->width);
 		}
 
+		/* Send final transformation matrix to vertex shader */
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
