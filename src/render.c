@@ -158,6 +158,11 @@ void f_render_evalstate(struct t_glfw_winstate *wst) {
 	wst->iq.start = 0, wst->iq.end = 0;
 }
 
+
+/* ---------------------- *
+ * Matrix transformations *
+ * ---------------------- */
+
 struct mat4x4f {
 	float arr[4][4];
 };
@@ -231,7 +236,7 @@ struct mat4x4f rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f view(double fov, double scalex, double scaley, double near, double far) {
+struct mat4x4f perspective(double fov, double scalex, double scaley, double near, double far) {
 	double zscale = (near + far)/(far - near);
 	double ztrans = 2*near*far/(near - far);
 	float sp = 1.0/tanf(fov/2.0);
@@ -288,48 +293,22 @@ const float pixels[] = {
 	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 };
 
-/* Main function wrapped around glfw initalization and window creation */
-void f_render_main(void* win) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(win);
+unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
+	static char chbuf[CHBUFSZ_] = {0};
+	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
+	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
+	unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
 
-	unsigned int sp;
-	{
-		static char chbuf[CHBUFSZ_];
-		unsigned int vert = f_gl_genshader("vertex.glsl", GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
-		unsigned int frag = f_gl_genshader("fragment.glsl", GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
-		sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
+	glDetachShader(sp, vert);
+	glDetachShader(sp, frag);
 
-		glDetachShader(sp, vert);
-		glDetachShader(sp, frag);
+	glDeleteShader(vert);
+	glDeleteShader(frag);
 
-		glDeleteShader(vert);
-		glDeleteShader(frag);
-	}
-	glUseProgram(sp);
+	return sp;
+}
 
-	/* Generate and bind objects */
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-	unsigned int texobj;
-	glGenTextures(1, &texobj);
-	glBindTexture(GL_TEXTURE_2D, texobj);
-
-	int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
-	// int scaleloc = glGetUniformLocation(sp, "scale");
-	// if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'scale'!\n");
-
-
+void f_render_init(void) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_DYNAMIC_DRAW);
 
@@ -356,62 +335,85 @@ void f_render_main(void* win) {
 	// glEnable(GL_CULL_FACE);
 	// glFrontFace(GL_CW);
 	// glCullFace(GL_FRONT);
+}
+
+void f_render_loop(void* win, int transformloc) {
+	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(win);
+	const struct mat4x4f radial = translate(0.4f, 0.1f, 0.0f);
+	const struct mat4x4f displace = translate(0.6f, 0.0f, 2.0f);
+	const struct mat4x4f shrink = scale(0.5f);
+
+	const double fov = M_PI/3.0;
+	const double near = 1.0;
+	const double far = 6.0;
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
-
-	{
-		const struct mat4x4f radial1 = translate(0.4f, 0.1f, 0.0f);
-		const struct mat4x4f displace = translate(0.6f, 0.0f, 2.0f);
-		const struct mat4x4f shrink = scale(0.5f);
-
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		static struct mat4x4f transform = c_mat4x4f_zero;
-		static struct mat4x4f perspective = c_mat4x4f_zero;
+		static struct mat4x4f eye = c_mat4x4f_zero;
 
 		/* Set viewport and view transform matrix */
 		if(wst->szrefresh) {
-			static const double fov = M_PI/3.0;
-			static const double near = 1.0;
-			static const double far = 6.0;
-			static double scalex = 0, scaley = 0;
-
+			double scalex, scaley;
 			wst->szrefresh = 0;
 			glViewport(0, 0, wst->width, wst->height);
-
 			if(wst->width > wst->height)
 				scalex = (double)wst->width / (double)wst->height, scaley = 1.0;
 			else
 				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
-
-			perspective = view(fov, scalex, scaley, near, far);
+			eye = perspective(fov, scalex, scaley, near, far);
 		}
 
 		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
 		struct mat4x4f arr[] = {
-			perspective,
+			eye,
 			displace,
 			rotatez(wst->time),
-			radial1,
+			radial,
 			shrink,
 			rotatez(-wst->time),
 			rotatey(3*wst->time),
 		};
 		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
 
-		/* Clear screen before drawing */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		/* Send final transformation matrix to vertex shader */
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
-		/* GLFW window handling */
 		glfwSwapBuffers(win);
 		glfwPollEvents();
-
 		f_render_evalstate(wst);
-	}}
+	}
+}
+
+/* Main function wrapped around glfw initalization and window creation */
+void f_render_main(void* win) {
+	unsigned int sp = f_render_genprogram("vertex.glsl", "fragment.glsl");
+	glUseProgram(sp);
+
+	/* Generate and bind objects */
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+	unsigned int texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	int transformloc = glGetUniformLocation(sp, "transform");
+	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
+
+	f_render_init();
+	f_render_loop(win, transformloc);
 
 	/* Cleanup */
 	glDeleteTextures(1, &texobj);
