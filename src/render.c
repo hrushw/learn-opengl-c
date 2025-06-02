@@ -231,13 +231,15 @@ struct mat4x4f rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f view(double fov, double scalex, double scaley) {
+struct mat4x4f view(double fov, double scalex, double scaley, double near, double far) {
+	double zscale = (near + far)/(far - near);
+	double ztrans = 2*near*far/(near - far);
 	float sp = 1.0/tanf(fov/2.0);
 	return (struct mat4x4f) {{
-		{ sp/scalex,       0.0, 0.0, 0.0 },
-		{       0.0, sp/scaley, 0.0, 0.0 },
-		{       0.0,       0.0, 1.0, 0.0 },
-		{       0.0,       0.0, 1.0, 0.0 },
+		{ sp/scalex,       0.0,    0.0,    0.0 },
+		{       0.0, sp/scaley,    0.0,    0.0 },
+		{       0.0,       0.0, zscale, ztrans },
+		{       0.0,       0.0,    1.0,    0.0 },
 	}};
 }
 
@@ -346,15 +348,14 @@ void f_render_main(void* win) {
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
-
-	// glDepthRange(1, 0);
-	// glEnable(GL_DEPTH_TEST);
-	// glDepthFunc(GL_LESS);
+	glDepthRange(-1.0, 1.0);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 
 	/* Culling overrides the depth test ??? */
-	glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CW);
-	glCullFace(GL_FRONT);
+	// glEnable(GL_CULL_FACE);
+	// glFrontFace(GL_CW);
+	// glCullFace(GL_FRONT);
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
@@ -367,22 +368,26 @@ void f_render_main(void* win) {
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		static struct mat4x4f transform = c_mat4x4f_zero;
 		static struct mat4x4f perspective = c_mat4x4f_zero;
-		static const double fov = M_PI/3.0;
 
-		/* Set viewport */
+		/* Set viewport and view transform matrix */
 		if(wst->szrefresh) {
+			static const double fov = M_PI/3.0;
+			static const double near = 1.0;
+			static const double far = 6.0;
+			static double scalex = 0, scaley = 0;
+
 			wst->szrefresh = 0;
 			glViewport(0, 0, wst->width, wst->height);
-			/* Give window scale information to vertex shader */
+
 			if(wst->width > wst->height)
-				perspective = view(fov, (double)wst->width/(double)wst->height, 1.0);
+				scalex = (double)wst->width / (double)wst->height, scaley = 1.0;
 			else
-				perspective = view(fov, 1.0, (double)wst->height/(double)wst->width);
+				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
+
+			perspective = view(fov, scalex, scaley, near, far);
 		}
 
-		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w *
-		 * However, the z value is also scaled down by w, and the projection matrix copies the z value into w,  *
-		 * so the depth test now no longer works as all z values are scaled to 1.0f */
+		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
 		struct mat4x4f arr[] = {
 			perspective,
 			displace,

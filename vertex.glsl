@@ -11,7 +11,6 @@ uniform mat4 transform;
 
 void main() {
 	gl_Position = transform * vec4(pos, 1.0f);
-	// gl_Position = vec4(pos, 1.0f);
 	color = in_clr;
 	tex_crd = texcoord;
 }
