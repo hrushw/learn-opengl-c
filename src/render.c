@@ -231,13 +231,13 @@ struct mat4x4f rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f projection(double angle) {
-	float scale = 1.0/tanf(angle/2.0);
+struct mat4x4f view(double fov, double scalex, double scaley) {
+	float sp = 1.0/tanf(fov/2.0);
 	return (struct mat4x4f) {{
-		{ scale,   0.0, 0.0, 0.0 },
-		{   0.0, scale, 0.0, 0.0 },
-		{   0.0,   0.0, 1.0, 0.0 },
-		{   0.0,   0.0, 1.0, 0.0 },
+		{ sp/scalex,       0.0, 0.0, 0.0 },
+		{       0.0, sp/scaley, 0.0, 0.0 },
+		{       0.0,       0.0, 1.0, 0.0 },
+		{       0.0,       0.0, 1.0, 0.0 },
 	}};
 }
 
@@ -324,8 +324,8 @@ void f_render_main(void* win) {
 
 	int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
-	int scaleloc = glGetUniformLocation(sp, "scale");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'scale'!\n");
+	// int scaleloc = glGetUniformLocation(sp, "scale");
+	// if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'scale'!\n");
 
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
@@ -358,25 +358,16 @@ void f_render_main(void* win) {
 
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
+
+	{
+		const struct mat4x4f radial1 = translate(0.4f, 0.1f, 0.0f);
+		const struct mat4x4f displace = translate(0.6f, 0.0f, 2.0f);
+		const struct mat4x4f shrink = scale(0.5f);
+
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		static struct mat4x4f transform = c_mat4x4f_zero;
-
-		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w *
-		 * However, the z value is also scaled down by w, and the projection matrix copies the z value into w,  *
-		 * so the depth test now no longer works as all z values are scaled to 1.0f */
-		struct mat4x4f arr[] = {
-			projection(M_PI/3.0),
-			translate(0.6f, 0, 2.0f),
-			rotatez(wst->time),
-			translate(0.4f, 0.1f, 0.0f),
-			scale(0.5f),
-			rotatez(-wst->time),
-			rotatey(3*wst->time),
-		};
-		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
-
-		/* Clear screen before drawing */
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		static struct mat4x4f perspective = c_mat4x4f_zero;
+		static const double fov = M_PI/3.0;
 
 		/* Set viewport */
 		if(wst->szrefresh) {
@@ -384,10 +375,27 @@ void f_render_main(void* win) {
 			glViewport(0, 0, wst->width, wst->height);
 			/* Give window scale information to vertex shader */
 			if(wst->width > wst->height)
-				glUniform2f(scaleloc, (double)wst->width / (double)wst->height, 1.0f);
+				perspective = view(fov, (double)wst->width/(double)wst->height, 1.0);
 			else
-				glUniform2f(scaleloc, 1.0f, (double)wst->height / (double)wst->width);
+				perspective = view(fov, 1.0, (double)wst->height/(double)wst->width);
 		}
+
+		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w *
+		 * However, the z value is also scaled down by w, and the projection matrix copies the z value into w,  *
+		 * so the depth test now no longer works as all z values are scaled to 1.0f */
+		struct mat4x4f arr[] = {
+			perspective,
+			displace,
+			rotatez(wst->time),
+			radial1,
+			shrink,
+			rotatez(-wst->time),
+			rotatey(3*wst->time),
+		};
+		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
+
+		/* Clear screen before drawing */
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		/* Send final transformation matrix to vertex shader */
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
@@ -398,7 +406,7 @@ void f_render_main(void* win) {
 		glfwPollEvents();
 
 		f_render_evalstate(wst);
-	}
+	}}
 
 	/* Cleanup */
 	glDeleteTextures(1, &texobj);
