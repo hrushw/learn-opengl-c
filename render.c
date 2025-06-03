@@ -1,6 +1,6 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-#include <glad/gl.h>
+#include <epoxy/gl.h>
 
 #include <stdio.h>
 #include <math.h>
@@ -511,7 +511,6 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
 	glfwMakeContextCurrent(win); // Setup OpenGL context
-	gladLoadGL(glfwGetProcAddress); // Load functions from above context
 	glfwSwapInterval(1); // calls to glfwSwapBuffers() will only cause swap once per frame
 	return win;
 }
