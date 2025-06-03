@@ -76,8 +76,7 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	/* Always return null-terminated string */
 	finish: buf[l] = 0;
 	if(len) *len = l;
-	if(fclose(f))
-		fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
+	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 	return;
 
 	failopen: fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
@@ -328,9 +327,9 @@ void f_render_init(void) {
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
 
-	glDepthRange(-1.0, 1.0);
+	// glDepthRange(-1.0, 1.0);
 	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS);
+	// glDepthFunc(GL_LESS);
 
 	/* Culling overrides the depth test ??? */
 	// glEnable(GL_CULL_FACE);
@@ -340,10 +339,6 @@ void f_render_init(void) {
 
 void f_render_loop(void* win, int transformloc) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(win);
-
-	const double fov = M_PI/3.0;
-	const double near = 1.0;
-	const double far = 6.0;
 
 	/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
 	struct mat4x4f transforms[] = {
@@ -361,14 +356,16 @@ void f_render_loop(void* win, int transformloc) {
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
 		/* Set viewport and view transform matrix */
 		if(wst->szrefresh) {
-			double scalex, scaley;
 			wst->szrefresh = 0;
 			glViewport(0, 0, wst->width, wst->height);
+
+			double scalex, scaley;
 			if(wst->width > wst->height)
 				scalex = (double)wst->width / (double)wst->height, scaley = 1.0;
 			else
 				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
-			transforms[0] = perspective(fov, scalex, scaley, near, far);
+
+			transforms[0] = perspective(M_PI/3.0, scalex, scaley, 1.0, 6.0);
 		}
 
 		transforms[2] = rotatez(wst->time);
@@ -524,8 +521,8 @@ int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 
-	void* const win;
-	if(!(win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
+	void* const win = f_glfw_initwin("Tetrahedron", 640, 480);
+	if(!win) goto end;
 
 	struct t_glfw_winstate ws = {
 		.width = 0, .height = 0,
