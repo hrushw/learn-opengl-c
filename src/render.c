@@ -58,7 +58,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 /* No longer causes program exit on failure */
 /* Returns length 0 on any failure, always null terminated */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
-	FILE* f = fopen(path, "rb");
+	FILE* const f = fopen(path, "rb");
 	long l = 0;
 	if(!f) goto failopen;
 	else if( fseek(f, 0L, SEEK_END) == -1 )
@@ -103,7 +103,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* chbuf, int chbufsz
 	int len = 0;
 	f_io_filetobuf(path, &len, chbuf, chbufsz);
 
-	unsigned int s = glCreateShader(type);
+	const unsigned int s = glCreateShader(type);
 	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
 	glCompileShader(s);
 
@@ -204,8 +204,8 @@ struct mat4x4f translate(float x, float y, float z) {
 }
 
 struct mat4x4f rotatex(double angle) {
-	float c = cos(angle);
-	float s = sin(angle);
+	const float c = cos(angle);
+	const float s = sin(angle);
 	return (struct mat4x4f) {{
 		{ 1.0, 0.0, 0.0, 0.0 },
 		{ 0.0,   c,  -s, 0.0 },
@@ -215,8 +215,8 @@ struct mat4x4f rotatex(double angle) {
 }
 
 struct mat4x4f rotatey(double angle) {
-	float c = cos(angle);
-	float s = sin(angle);
+	const float c = cos(angle);
+	const float s = sin(angle);
 	return (struct mat4x4f) {{
 		{   c, 0.0,   s, 0.0 },
 		{ 0.0, 1.0, 0.0, 0.0 },
@@ -226,8 +226,8 @@ struct mat4x4f rotatey(double angle) {
 }
 
 struct mat4x4f rotatez(double angle) {
-	float c = cos(angle);
-	float s = sin(angle);
+	const float c = cos(angle);
+	const float s = sin(angle);
 	return (struct mat4x4f) {{
 		{   c,  -s, 0.0, 0.0 },
 		{   s,   c, 0.0, 0.0 },
@@ -237,9 +237,9 @@ struct mat4x4f rotatez(double angle) {
 }
 
 struct mat4x4f perspective(double fov, double scalex, double scaley, double near, double far) {
-	double zscale = (near + far)/(far - near);
-	double ztrans = 2*near*far/(near - far);
-	float sp = 1.0/tanf(fov/2.0);
+	const double zscale = (near + far)/(far - near);
+	const double ztrans = 2*near*far/(near - far);
+	const float sp = 1.0/tanf(fov/2.0);
 	return (struct mat4x4f) {{
 		{ sp/scalex,       0.0,    0.0,    0.0 },
 		{       0.0, sp/scaley,    0.0,    0.0 },
@@ -295,9 +295,10 @@ const float pixels[] = {
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	static char chbuf[CHBUFSZ_] = {0};
-	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
-	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
-	unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
+
+	const unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
+	const unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
+	const unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
@@ -338,21 +339,26 @@ void f_render_init(void) {
 }
 
 void f_render_loop(void* win, int transformloc) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(win);
-	const struct mat4x4f radial = translate(0.4f, 0.1f, 0.0f);
-	const struct mat4x4f displace = translate(0.6f, 0.0f, 2.0f);
-	const struct mat4x4f shrink = scale(0.5f);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(win);
 
 	const double fov = M_PI/3.0;
 	const double near = 1.0;
 	const double far = 6.0;
 
+	/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
+	struct mat4x4f transforms[] = {
+		c_mat4x4f_identity,
+		translate(0.6f, 0.0f, 2.0f),
+		c_mat4x4f_identity,
+		translate(0.4f, 0.1f, 0.0f),
+		scale(0.5f),
+		c_mat4x4f_identity,
+		c_mat4x4f_identity,
+	};
+
 	/* Initialize time and loop */
 	glfwSetTime(0.0);
 	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
-		static struct mat4x4f transform = c_mat4x4f_zero;
-		static struct mat4x4f eye = c_mat4x4f_zero;
-
 		/* Set viewport and view transform matrix */
 		if(wst->szrefresh) {
 			double scalex, scaley;
@@ -362,23 +368,17 @@ void f_render_loop(void* win, int transformloc) {
 				scalex = (double)wst->width / (double)wst->height, scaley = 1.0;
 			else
 				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
-			eye = perspective(fov, scalex, scaley, near, far);
+			transforms[0] = perspective(fov, scalex, scaley, near, far);
 		}
 
-		/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
-		struct mat4x4f arr[] = {
-			eye,
-			displace,
-			rotatez(wst->time),
-			radial,
-			shrink,
-			rotatez(-wst->time),
-			rotatey(3*wst->time),
-		};
-		transform = multiplylist(arr, (sizeof arr)/sizeof(struct mat4x4f));
+		transforms[2] = rotatez(wst->time);
+		transforms[5] = rotatez(-wst->time);
+		transforms[6] = rotatey(3*wst->time);
+
+		const struct mat4x4f tf = multiplylist(transforms, (sizeof transforms)/sizeof(struct mat4x4f));
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(transform.arr[0][0]));
+		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(tf.arr[0][0]));
 		glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
 
 		glfwSwapBuffers(win);
@@ -389,7 +389,7 @@ void f_render_loop(void* win, int transformloc) {
 
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
-	unsigned int sp = f_render_genprogram("vertex.glsl", "fragment.glsl");
+	const unsigned int sp = f_render_genprogram("vertex.glsl", "fragment.glsl");
 	glUseProgram(sp);
 
 	/* Generate and bind objects */
@@ -409,7 +409,7 @@ void f_render_main(void* win) {
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
-	int transformloc = glGetUniformLocation(sp, "transform");
+	const int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
 
 	f_render_init();
@@ -436,7 +436,7 @@ void f_glfw_callback_error(int err, const char* desc) {
 /* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
 /* Additionally store mouse coordinates into queue */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ key, action, mods, wst->mx, wst->my, wst->time });
 	/* Scancode remains unused */
 	(void)scancode;
@@ -444,26 +444,26 @@ void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, 
 
 /* Cursor position callback: simply update global mouse coordinates */
 void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	wst->mx = x, wst->my = y;
 }
 
 /* Mouse click callback: same as key callback */
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ button, action, mods, wst->mx, wst->my, wst->time });
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */
 void f_glfw_callback_fbresize(GLFWwindow *window, int width, int height) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	wst->width = width, wst->height = height, wst->szrefresh = 1;
 }
 
 /* Callback for window close event */
 void f_glfw_callback_winclose(GLFWwindow *window) {
-	struct t_glfw_winstate *wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	wst->runstate = 0;
 }
 
@@ -475,7 +475,7 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) return NULL;
 
-	const GLFWvidmode* mode = glfwGetVideoMode(mon);
+	const GLFWvidmode* const mode = glfwGetVideoMode(mon);
 	if(!mode) return NULL;
 
 	switch(type) {
@@ -503,7 +503,7 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
-	void* win = f_glfw_crwin(title, width, height, WIN_DEF);
+	void* const win = f_glfw_crwin(title, width, height, WIN_DEF);
 	if(!win) return NULL;
 
 	/* Setup callback functions */
@@ -524,20 +524,20 @@ int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 
-	void* win;
-	static struct t_glfw_winstate ws = {
+	void* const win;
+	if(!(win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
+
+	struct t_glfw_winstate ws = {
 		.width = 0, .height = 0,
 		.mx = 0, .my = 0,
 		.time = 0,
-		.szrefresh = 1,
-		.runstate = 1,
 		.iq = {
 			.start = 0, .end = 0,
 			.queue = {{0}}
 		},
+		.szrefresh = 1,
+		.runstate = 1,
 	};
-
-	if(!(win = f_glfw_initwin("Tetrahedron", 640, 480))) goto end;
 	glfwGetFramebufferSize(win, &ws.width, &ws.height);
 	glfwSetWindowUserPointer(win, &ws);
 
