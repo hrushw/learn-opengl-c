@@ -8,6 +8,7 @@
 /* References
  * OpenGL Tutorials (Victor Gordan) - https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-
  * OpenGL for Beginners (OGLDEV) - https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA
+ * LearnOpenGL (Camera) - https://learnopengl.com/Getting-started/Camera
 
  * OpenGL 4.6 specification - https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf
  * GLFW documentation [window guide] - https://www.glfw.org/docs/latest/window_guide.html
@@ -60,8 +61,10 @@ void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* const f = fopen(path, "rb");
 	long l = 0;
-	if(!f) goto failopen;
-	else if( fseek(f, 0L, SEEK_END) == -1 )
+	if(!f) {
+		fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
+		return;
+	} else if( fseek(f, 0L, SEEK_END) == -1 )
 		fprintf(stderr, "ERROR: Failed to seek to end of file '%s'!\n", path);
 	else if( (l = ftell(f)) < 0 )
 		fprintf(stderr, "ERROR: Failed to get size of file '%s'\n", path);
@@ -77,9 +80,6 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	finish: buf[l] = 0;
 	if(len) *len = l;
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
-	return;
-
-	failopen: fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
 }
 
 /* Check if shader was compiled successfully */
@@ -180,7 +180,7 @@ const struct mat4x4f c_mat4x4f_zero = {{
 	{ 0.0, 0.0, 0.0, 0.0 },
 }};
 
-struct mat4x4f scale3d(float x, float y, float z) {
+struct mat4x4f f_mat_scale3d(float x, float y, float z) {
 	return (struct mat4x4f){{
 		{   x, 0.0, 0.0, 0.0 },
 		{ 0.0,   y, 0.0, 0.0 },
@@ -189,11 +189,11 @@ struct mat4x4f scale3d(float x, float y, float z) {
 	}};
 }
 
-static inline struct mat4x4f scale(float s) {
-	return scale3d(s, s, s);
+static inline struct mat4x4f f_mat_scale(float s) {
+	return f_mat_scale3d(s, s, s);
 }
 
-struct mat4x4f translate(float x, float y, float z) {
+struct mat4x4f f_mat_translate(float x, float y, float z) {
 	return (struct mat4x4f){{
 		{ 1.0, 0.0, 0.0,   x },
 		{ 0.0, 1.0, 0.0,   y },
@@ -202,7 +202,7 @@ struct mat4x4f translate(float x, float y, float z) {
 	}};
 }
 
-struct mat4x4f rotatex(double angle) {
+struct mat4x4f f_mat_rotatex(double angle) {
 	const float c = cos(angle);
 	const float s = sin(angle);
 	return (struct mat4x4f) {{
@@ -213,7 +213,7 @@ struct mat4x4f rotatex(double angle) {
 	}};
 }
 
-struct mat4x4f rotatey(double angle) {
+struct mat4x4f f_mat_rotatey(double angle) {
 	const float c = cos(angle);
 	const float s = sin(angle);
 	return (struct mat4x4f) {{
@@ -224,7 +224,7 @@ struct mat4x4f rotatey(double angle) {
 	}};
 }
 
-struct mat4x4f rotatez(double angle) {
+struct mat4x4f f_mat_rotatez(double angle) {
 	const float c = cos(angle);
 	const float s = sin(angle);
 	return (struct mat4x4f) {{
@@ -235,40 +235,48 @@ struct mat4x4f rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f perspective(double fov, double scalex, double scaley, double near, double far) {
+struct mat4x4f f_mat_perspective(double fov, double sx, double sy, double near, double far) {
 	const double zscale = (near + far)/(far - near);
 	const double ztrans = 2*near*far/(near - far);
 	const float sp = 1.0/tanf(fov/2.0);
 	return (struct mat4x4f) {{
-		{ sp/scalex,       0.0,    0.0,    0.0 },
-		{       0.0, sp/scaley,    0.0,    0.0 },
-		{       0.0,       0.0, zscale, ztrans },
-		{       0.0,       0.0,    1.0,    0.0 },
+		{ sp/sx,   0.0,    0.0,    0.0 },
+		{   0.0, sp/sy,    0.0,    0.0 },
+		{   0.0,   0.0, zscale, ztrans },
+		{   0.0,   0.0,    1.0,    0.0 },
 	}};
 }
 
-struct mat4x4f multiply(struct mat4x4f a, struct mat4x4f b) {
+struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
 	struct mat4x4f out = c_mat4x4f_zero;
 	for(int i = 0; i < 4; ++i) for(int j = 0; j < 4; ++j) for(int k = 0; k < 4; ++k)
 		out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
 	return out;
 }
 
-struct mat4x4f multiplylist(struct mat4x4f *m, int n) {
+struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
 	switch(n) {
 		case 0:
 			return c_mat4x4f_identity;
 		case 1:
 			return m[0];
 		case 2:
-			return multiply(m[0], m[1]);
+			return f_mat_multiply(m[0], m[1]);
 		default:
-			return multiply(
-				multiplylist(m, n/2),
-				multiplylist(m + n/2, n/2 + n%2)
+			return f_mat_multiply(
+				f_mat_multiplylist(m, n/2),
+				f_mat_multiplylist(m + n/2, n/2 + n%2)
 			);
 	}
 }
+
+struct Camera {
+	float x, y, z;
+	double pitch, yaw, roll;
+	double fov;
+};
+
+struct mat4x4f f_mat_camera(struct Camera c, double sx, double sy, double near, double far);
 
 /* xyz coordinates, rgb colors, texture coordinates  */
 const float vertices[] = {
@@ -343,10 +351,10 @@ void f_render_loop(void* win, int transformloc) {
 	/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
 	struct mat4x4f transforms[] = {
 		c_mat4x4f_identity,
-		translate(0.6f, 0.0f, 2.0f),
+		f_mat_translate(0.6f, 0.0f, 2.0f),
 		c_mat4x4f_identity,
-		translate(0.4f, 0.1f, 0.0f),
-		scale(0.5f),
+		f_mat_translate(0.4f, 0.1f, 0.0f),
+		f_mat_scale(0.5f),
 		c_mat4x4f_identity,
 		c_mat4x4f_identity,
 	};
@@ -365,14 +373,14 @@ void f_render_loop(void* win, int transformloc) {
 			else
 				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
 
-			transforms[0] = perspective(M_PI/3.0, scalex, scaley, 1.0, 6.0);
+			transforms[0] = f_mat_perspective(M_PI/3.0, scalex, scaley, 1.0, 6.0);
 		}
 
-		transforms[2] = rotatez(wst->time);
-		transforms[5] = rotatez(-wst->time);
-		transforms[6] = rotatey(3*wst->time);
+		transforms[2] = f_mat_rotatez(wst->time);
+		transforms[5] = f_mat_rotatez(-wst->time);
+		transforms[6] = f_mat_rotatey(3*wst->time);
 
-		const struct mat4x4f tf = multiplylist(transforms, (sizeof transforms)/sizeof(struct mat4x4f));
+		const struct mat4x4f tf = f_mat_multiplylist(transforms, (sizeof transforms)/sizeof(struct mat4x4f));
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(tf.arr[0][0]));
