@@ -255,28 +255,13 @@ struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
 }
 
 struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
-	switch(n) {
-		case 0:
-			return c_mat4x4f_identity;
-		case 1:
-			return m[0];
-		case 2:
-			return f_mat_multiply(m[0], m[1]);
-		default:
-			return f_mat_multiply(
-				f_mat_multiplylist(m, n/2),
-				f_mat_multiplylist(m + n/2, n/2 + n%2)
-			);
-	}
+	if(n == 0) return c_mat4x4f_identity;
+
+	struct mat4x4f out = m[0];
+	for(int i = 1; i < n; ++i)
+		out = f_mat_multiply(out, m[i]);
+	return out;
 }
-
-struct Camera {
-	float x, y, z;
-	double pitch, yaw, roll;
-	double fov;
-};
-
-struct mat4x4f f_mat_camera(struct Camera c, double sx, double sy, double near, double far);
 
 /* xyz coordinates, rgb colors, texture coordinates  */
 const float vertices[] = {
@@ -523,6 +508,18 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	return win;
 }
 
+struct t_glfw_winstate ws = {
+	.width = 0, .height = 0,
+	.mx = 0, .my = 0,
+	.time = 0,
+	.iq = {
+		.start = 0, .end = 0,
+		.queue = {{0}}
+	},
+	.szrefresh = 1,
+	.runstate = 1,
+};
+
 /* Main function */
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
@@ -531,17 +528,6 @@ int main(void) {
 	void* const win = f_glfw_initwin("Tetrahedron", 640, 480);
 	if(!win) goto end;
 
-	struct t_glfw_winstate ws = {
-		.width = 0, .height = 0,
-		.mx = 0, .my = 0,
-		.time = 0,
-		.iq = {
-			.start = 0, .end = 0,
-			.queue = {{0}}
-		},
-		.szrefresh = 1,
-		.runstate = 1,
-	};
 	glfwGetFramebufferSize(win, &ws.width, &ws.height);
 	glfwSetWindowUserPointer(win, &ws);
 
