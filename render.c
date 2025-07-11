@@ -15,13 +15,13 @@
  * OpenGL wiki [Rendering Pipeline Overview] - https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview
  */
 
-enum e_sizes { IQSZ_ = 256, CHBUFSZ_ = 0x10000 };
-
 /* Keypress struct - don't care about scancode or window */
 struct t_glfw_inputevent {
 	int key, action, mods;
 	double mx, my, time;
 };
+
+enum e_iqsz_ { IQSZ_ = 256 };
 
 /* Queue keyboard and mouse input events to be evaluated  */
 struct t_glfw_inputqueue {
@@ -40,11 +40,12 @@ struct t_glfw_winstate {
 	int runstate;
 };
 
+
 /* Append to queue - bounds check merged with function */
 void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
-	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_ || q->start > q->end ) {
+	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_ || q->start > q->end) {
 		/* If bounds check fails, log error and reset the queue */
 		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
 		q->start = 0, q->end = 0;
@@ -61,6 +62,7 @@ void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	FILE* const f = fopen(path, "rb");
 	long l = 0;
+
 	if(!f) {
 		fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
 		return;
@@ -73,11 +75,13 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
 	else goto finish;
+
 	/* On any read failures return empty string */
 	l = 0;
 
 	/* Always return null-terminated string */
-	finish: buf[l] = 0;
+	finish:
+	buf[l] = 0;
 	if(len) *len = l;
 	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
 }
@@ -92,6 +96,7 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
 		fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+
 	glGetShaderInfoLog(s, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
 	fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
@@ -120,6 +125,7 @@ void f_gl_chklink(unsigned int sp, char* infolog, int il_len) {
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
 		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+
 	glGetProgramInfoLog(sp, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
 	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
@@ -146,13 +152,17 @@ static inline void updatetime(double *time, double *t0, double *dt) {
 void f_render_evalstate(struct t_glfw_winstate *wst) {
 	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
+
 		// if(qev.key == GLFW_KEY_R && qev.mods == GLFW_MOD_CONTROL && qev.action == GLFW_RELEASE)
 		// 	f_gl_prog_destroy(), f_gl_prog_create();
+
 		if(qev->key == GLFW_KEY_T && qev->mods == GLFW_MOD_CONTROL && qev->action == GLFW_RELEASE)
 			glfwSetTime(0.0), wst->time = 0;
+
 		if(qev->key == GLFW_KEY_Q && qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && qev->action == GLFW_RELEASE )
 			wst->runstate = 0;
 	}
+
 	/* Reset queue after evaluation */
 	wst->iq.start = 0, wst->iq.end = 0;
 }
@@ -205,6 +215,7 @@ struct mat4x4f f_mat_translate(float x, float y, float z) {
 struct mat4x4f f_mat_rotatex(double angle) {
 	const float c = cos(angle);
 	const float s = sin(angle);
+
 	return (struct mat4x4f) {{
 		{ 1.0, 0.0, 0.0, 0.0 },
 		{ 0.0,   c,  -s, 0.0 },
@@ -216,6 +227,7 @@ struct mat4x4f f_mat_rotatex(double angle) {
 struct mat4x4f f_mat_rotatey(double angle) {
 	const float c = cos(angle);
 	const float s = sin(angle);
+
 	return (struct mat4x4f) {{
 		{   c, 0.0,   s, 0.0 },
 		{ 0.0, 1.0, 0.0, 0.0 },
@@ -239,6 +251,7 @@ struct mat4x4f f_mat_perspective(double fov, double sx, double sy, double near, 
 	const double zscale = (near + far)/(far - near);
 	const double ztrans = 2*near*far/(near - far);
 	const float sp = 1.0/tanf(fov/2.0);
+
 	return (struct mat4x4f) {{
 		{ sp/sx,   0.0,    0.0,    0.0 },
 		{   0.0, sp/sy,    0.0,    0.0 },
@@ -249,13 +262,18 @@ struct mat4x4f f_mat_perspective(double fov, double sx, double sy, double near, 
 
 struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
 	struct mat4x4f out = c_mat4x4f_zero;
-	for(int i = 0; i < 4; ++i) for(int j = 0; j < 4; ++j) for(int k = 0; k < 4; ++k)
-		out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
+
+	for(int i = 0; i < 4; ++i)
+		for(int j = 0; j < 4; ++j)
+			for(int k = 0; k < 4; ++k)
+				out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
+
 	return out;
 }
 
 struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
-	if(n == 0) return c_mat4x4f_identity;
+	if(n == 0)
+		return c_mat4x4f_identity;
 
 	struct mat4x4f out = m[0];
 	for(int i = 1; i < n; ++i)
@@ -284,6 +302,8 @@ const float pixels[] = {
 	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
 	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 };
+
+enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	static char chbuf[CHBUFSZ_] = {0};
@@ -428,6 +448,7 @@ void f_glfw_callback_error(int err, const char* desc) {
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ key, action, mods, wst->mx, wst->my, wst->time });
+
 	/* Scancode remains unused */
 	(void)scancode;
 }
@@ -475,13 +496,17 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 			glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 			glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 			break;
+
 		case WIN_MAX:
 			glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 			/* fall through */
+
 		case WIN_DEF:
 		default:
 			mon = NULL;
-	} return glfwCreateWindow(width, height, title, mon, NULL);
+	}
+
+	return glfwCreateWindow(width, height, title, mon, NULL);
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
