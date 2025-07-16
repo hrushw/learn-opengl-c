@@ -15,13 +15,17 @@
  * OpenGL wiki [Rendering Pipeline Overview] - https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview
  */
 
+#define M_LEN(x) (sizeof(x) / sizeof(*x))
+
+enum e_iqsz_ { IQSZ_ = 256 };
+enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
+enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
+
 /* Keypress struct - don't care about scancode or window */
 struct t_glfw_inputevent {
 	int key, action, mods;
 	double mx, my, time;
 };
-
-enum e_iqsz_ { IQSZ_ = 256 };
 
 /* Queue keyboard and mouse input events to be evaluated  */
 struct t_glfw_inputqueue {
@@ -45,9 +49,17 @@ struct t_glfw_winstate {
 void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
-	if(q->start < 0 || q->start >= IQSZ_ || q->end < 0 || q->end >= 2*IQSZ_ || q->end - q->start >= IQSZ_ || q->start > q->end) {
+	if(
+		q->start < 0 || q->start >= IQSZ_ ||
+		q->end < 0 || q->end >= 2*IQSZ_ ||
+		q->end - q->start >= IQSZ_ || q->start > q->end
+	) {
 		/* If bounds check fails, log error and reset the queue */
-		fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n(start index = %d, end index = %d, max queue size = %d)\n", q->start, q->end, IQSZ_);
+		fprintf(stderr,
+			"ERROR: Key press queue indices out of bounds!\n"
+			"(start index = %d, end index = %d, max queue size = %d)\n",
+			q->start, q->end, IQSZ_
+		);
 		q->start = 0, q->end = 0;
 	}
 
@@ -95,7 +107,11 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
-		fprintf(stderr, "ERROR: Unable to get complete shader info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+		fprintf(stderr,
+			"ERROR: Unable to get complete shader info log - log too large!\n"
+			"(size = %d, max size = %d)\n",
+			gl_il_len, il_len
+		);
 
 	glGetShaderInfoLog(s, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
@@ -124,7 +140,11 @@ void f_gl_chklink(unsigned int sp, char* infolog, int il_len) {
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(gl_il_len > il_len)
-		fprintf(stderr, "ERROR: Unable to get complete shader program info log - log too large!\n(size = %d, max size = %d)\n", gl_il_len, il_len);
+		fprintf(stderr,
+			"ERROR: Unable to get complete shader program info log - log too large!\n"
+			"(size = %d, max size = %d)\n",
+			gl_il_len, il_len
+		);
 
 	glGetProgramInfoLog(sp, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
@@ -144,22 +164,23 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, 
 	return sp;
 }
 
-static inline void updatetime(double *time, double *t0, double *dt) {
-	*time = glfwGetTime(), *dt = *time - *t0, *t0 = *time;
-}
-
-/* Evaluate keyboard and mouse events - currently handles shortcuts for hot reloading and exit */
+/* Evaluate keyboard and mouse events - currently handles shortcuts for resetting time and exit */
 void f_render_evalstate(struct t_glfw_winstate *wst) {
 	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
 
-		// if(qev.key == GLFW_KEY_R && qev.mods == GLFW_MOD_CONTROL && qev.action == GLFW_RELEASE)
-		// 	f_gl_prog_destroy(), f_gl_prog_create();
+		if(
+			qev->key == GLFW_KEY_T &&
+			qev->mods == GLFW_MOD_CONTROL &&
+			qev->action == GLFW_RELEASE
+		)
+			glfwSetTime(0.0), wst->time = 0.0;
 
-		if(qev->key == GLFW_KEY_T && qev->mods == GLFW_MOD_CONTROL && qev->action == GLFW_RELEASE)
-			glfwSetTime(0.0), wst->time = 0;
-
-		if(qev->key == GLFW_KEY_Q && qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) && qev->action == GLFW_RELEASE )
+		if(
+			qev->key == GLFW_KEY_Q &&
+			qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) &&
+			qev->action == GLFW_RELEASE
+		)
 			wst->runstate = 0;
 	}
 
@@ -189,6 +210,27 @@ const struct mat4x4f c_mat4x4f_zero = {{
 	{ 0.0, 0.0, 0.0, 0.0 },
 	{ 0.0, 0.0, 0.0, 0.0 },
 }};
+
+struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
+	struct mat4x4f out = c_mat4x4f_zero;
+
+	for(int i = 0; i < 4; ++i)
+		for(int j = 0; j < 4; ++j)
+			for(int k = 0; k < 4; ++k)
+				out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
+
+	return out;
+}
+
+struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
+	if(n == 0)
+		return c_mat4x4f_identity;
+
+	struct mat4x4f out = m[0];
+	for(int i = 1; i < n; ++i)
+		out = f_mat_multiply(out, m[i]);
+	return out;
+}
 
 struct mat4x4f f_mat_scale3d(float x, float y, float z) {
 	return (struct mat4x4f){{
@@ -260,27 +302,6 @@ struct mat4x4f f_mat_perspective(double fov, double sx, double sy, double near, 
 	}};
 }
 
-struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
-	struct mat4x4f out = c_mat4x4f_zero;
-
-	for(int i = 0; i < 4; ++i)
-		for(int j = 0; j < 4; ++j)
-			for(int k = 0; k < 4; ++k)
-				out.arr[i][j] += a.arr[i][k] * b.arr[k][j];
-
-	return out;
-}
-
-struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
-	if(n == 0)
-		return c_mat4x4f_identity;
-
-	struct mat4x4f out = m[0];
-	for(int i = 1; i < n; ++i)
-		out = f_mat_multiply(out, m[i]);
-	return out;
-}
-
 /* xyz coordinates, rgb colors, texture coordinates  */
 const float vertices[] = {
 	 0.0f,  0.8f,  0.0f,    1.0f, 1.0f, 1.0f,    0.0f, 0.0f,
@@ -302,8 +323,6 @@ const float pixels[] = {
 	0.6f, 1.0f, 0.8f,    0.5f, 0.9f, 0.6f,    1.0f, 0.2f, 0.4f,    0.6f, 1.0f, 0.8f,
 	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 };
-
-enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	static char chbuf[CHBUFSZ_] = {0};
@@ -353,7 +372,8 @@ void f_render_init(void) {
 void f_render_loop(void* win, int transformloc) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(win);
 
-	/* Projection matrix must be applied last - fixed function stage in OpenGL scales all vectors down by w */
+	/* Projection matrix must be applied last - *
+	 * fixed function stage in OpenGL scales all vectors down by w */
 	struct mat4x4f transforms[] = {
 		c_mat4x4f_identity,
 		f_mat_translate(0.6f, 0.0f, 2.0f),
@@ -365,8 +385,7 @@ void f_render_loop(void* win, int transformloc) {
 	};
 
 	/* Initialize time and loop */
-	glfwSetTime(0.0);
-	for(double t0 = 0, dt = 0; wst->runstate; updatetime(&wst->time, &t0, &dt)) {
+	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
 		/* Set viewport and view transform matrix */
 		if(wst->szrefresh) {
 			wst->szrefresh = 0;
@@ -385,7 +404,7 @@ void f_render_loop(void* win, int transformloc) {
 		transforms[5] = f_mat_rotatez(-wst->time);
 		transforms[6] = f_mat_rotatey(3*wst->time);
 
-		const struct mat4x4f tf = f_mat_multiplylist(transforms, (sizeof transforms)/sizeof(struct mat4x4f));
+		const struct mat4x4f tf = f_mat_multiplylist(transforms, M_LEN(transforms));
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(tf.arr[0][0]));
@@ -399,9 +418,6 @@ void f_render_loop(void* win, int transformloc) {
 
 /* Main function wrapped around glfw initalization and window creation */
 void f_render_main(void* win) {
-	const unsigned int sp = f_render_genprogram("vertex.glsl", "fragment.glsl");
-	glUseProgram(sp);
-
 	/* Generate and bind objects */
 	unsigned int VAO;
 	glGenVertexArrays(1, &VAO);
@@ -418,6 +434,9 @@ void f_render_main(void* win) {
 	unsigned int texobj;
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
+
+	const unsigned int sp = f_render_genprogram("vertex.glsl", "fragment.glsl");
+	glUseProgram(sp);
 
 	const int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
@@ -479,8 +498,6 @@ void f_glfw_callback_winclose(GLFWwindow *window) {
 }
 
 
-enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
-
 /* Create window - optionally maximize and make it fullscreen */
 void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type) {
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
@@ -533,18 +550,6 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	return win;
 }
 
-struct t_glfw_winstate ws = {
-	.width = 0, .height = 0,
-	.mx = 0, .my = 0,
-	.time = 0,
-	.iq = {
-		.start = 0, .end = 0,
-		.queue = {{0}}
-	},
-	.szrefresh = 1,
-	.runstate = 1,
-};
-
 /* Main function */
 int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
@@ -552,6 +557,18 @@ int main(void) {
 
 	void* const win = f_glfw_initwin("Tetrahedron", 640, 480);
 	if(!win) goto end;
+
+	struct t_glfw_winstate ws = {
+		.width = 0, .height = 0,
+		.mx = 0, .my = 0,
+		.time = 0,
+		.iq = {
+			.start = 0, .end = 0,
+			.queue = {{0}}
+		},
+		.szrefresh = 1,
+		.runstate = 1,
+	};
 
 	glfwGetFramebufferSize(win, &ws.width, &ws.height);
 	glfwSetWindowUserPointer(win, &ws);
