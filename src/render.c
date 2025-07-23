@@ -388,7 +388,7 @@ void f_render_main(void* win) {
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
-	const unsigned int sp = f_render_genprogram("src/vertex.glsl", "src/fragment.glsl");
+	const unsigned int sp = f_render_genprogram("shaders/vertex.glsl", "shaders/fragment.glsl");
 	glUseProgram(sp);
 
 	const int transformloc = glGetUniformLocation(sp, "transform");
@@ -404,5 +404,4 @@ void f_render_main(void* win) {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteProgram(sp);
 }
-
 
