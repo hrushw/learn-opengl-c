@@ -1,3 +1,6 @@
+#ifndef __H__WINDOW_H___
+#define __H__WINDOW_H___
+
 #define GLFW_INCLUDE_NON
 #include <GLFW/glfw3.h>
 
@@ -30,3 +33,4 @@ struct t_glfw_winstate {
 void* f_glfw_initwin(const char* title, int width, int height);
 void f_glfw_callback_error(int err, const char* desc);
 
+#endif

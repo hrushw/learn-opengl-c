@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __H__MATRIX_H___
+#define __H__MATRIX_H___
 
 struct mat4x4f {
 	float arr[4][4];
@@ -24,3 +25,5 @@ struct mat4x4f f_mat_perspective(
 	double sx, double sy,
 	double near, double far
 );
+
+#endif
