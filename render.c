@@ -324,22 +324,6 @@ const float pixels[] = {
 	0.4f, 0.9f, 1.0f,    0.8f, 0.5f, 0.5f,    0.3f, 0.3f, 1.0f,    0.8f, 0.5f, 0.5f,
 };
 
-unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
-	static char chbuf[CHBUFSZ_] = {0};
-
-	const unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
-	const unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
-	const unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
-
-	glDetachShader(sp, vert);
-	glDetachShader(sp, frag);
-
-	glDeleteShader(vert);
-	glDeleteShader(frag);
-
-	return sp;
-}
-
 void f_render_init(void) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_DYNAMIC_DRAW);
@@ -414,6 +398,22 @@ void f_render_loop(void* win, int transformloc) {
 		glfwPollEvents();
 		f_render_evalstate(wst);
 	}
+}
+
+unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
+	static char chbuf[CHBUFSZ_] = {0};
+
+	const unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
+	const unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
+	const unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
+
+	glDetachShader(sp, vert);
+	glDetachShader(sp, frag);
+
+	glDeleteShader(vert);
+	glDeleteShader(frag);
+
+	return sp;
 }
 
 /* Main function wrapped around glfw initalization and window creation */
