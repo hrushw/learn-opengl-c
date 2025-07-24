@@ -14,7 +14,7 @@ obj/main.o: src/main.c include/window.h
 obj/window.o: src/window.c include/window.h
 	$(CC) src/window.c $(INCFLAGS) -c -o obj/window.o
 
-obj/render.o: src/render.c src/shader.c src/matrix.c include/window.h
+obj/render.o: src/render.c include/window.h
 	$(CC) src/render.c $(INCFLAGS) -c -o obj/render.o
 
 clean:
