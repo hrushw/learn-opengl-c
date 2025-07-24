@@ -60,14 +60,14 @@ void f_render_evalstate(struct t_glfw_winstate *wst) {
 
 		if (
 			qev->key == GLFW_KEY_T &&
-			qev->mods == GLFW_MOD_CONTROL &&
+			qev->mods & GLFW_MOD_CONTROL &&
 			qev->action == GLFW_RELEASE
 		)
 			glfwSetTime(0.0), wst->time = 0.0;
 
 		if (
 			qev->key == GLFW_KEY_Q &&
-			qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) &&
+			qev->mods & GLFW_MOD_CONTROL &&
 			qev->action == GLFW_RELEASE
 		)
 			wst->runstate = 0;
