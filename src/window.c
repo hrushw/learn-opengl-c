@@ -5,8 +5,6 @@
 
 #include "window.h"
 
-void f_render_main(void* win);
-
 /* Append to queue - bounds check merged with function */
 void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
@@ -103,7 +101,13 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 }
 
 /* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-void* f_glfw_initwin(const char* title, int width, int height) {
+void* f_glfw_initwin (
+	const char* title,
+	int width,
+	int height,
+	enum e_wintype wt,
+	struct t_glfw_winstate *wst
+) {
 	/* Initialize window with OpenGL 4.6 core context */
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -111,7 +115,7 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
-	void* const win = f_glfw_crwin(title, width, height, WIN_DEF);
+	void* const win = f_glfw_crwin(title, width, height, wt);
 	if(!win) return NULL;
 
 	/* Setup callback functions */
@@ -121,37 +125,16 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
-	glfwMakeContextCurrent(win); // Setup OpenGL context
-	glfwSwapInterval(1); // calls to glfwSwapBuffers() will only cause swap once per frame
+	/* Setup OpenGL context */
+	glfwMakeContextCurrent(win); 
+
+	/* Calls to glfwSwapBuffers() will only cause swap once per frame */
+	glfwSwapInterval(1);
+
+	glfwGetFramebufferSize(win, &wst->width, &wst->height);
+	glfwSetWindowUserPointer(win, wst);
+
 	return win;
 }
 
-/* Main function */
-int main(void) {
-	glfwSetErrorCallback(f_glfw_callback_error);
-	if(!glfwInit()) return -1;
 
-	void* const win = f_glfw_initwin("Tetrahedron", 640, 480);
-	if(!win) goto end;
-
-	struct t_glfw_winstate ws = {
-		.width = 0, .height = 0,
-		.mx = 0, .my = 0,
-		.time = 0,
-		.iq = {
-			.start = 0, .end = 0,
-			.queue = {{0}}
-		},
-		.szrefresh = 1,
-		.runstate = 1,
-	};
-
-	glfwGetFramebufferSize(win, &ws.width, &ws.height);
-	glfwSetWindowUserPointer(win, &ws);
-
-	f_render_main(win);
-
-	glfwDestroyWindow(win);
-	end: glfwTerminate();
-	return 0;
-}

@@ -27,4 +27,14 @@ struct t_glfw_winstate {
 	int runstate;
 };
 
+void f_glfw_callback_error(int err, const char* desc);
+
+void* f_glfw_initwin (
+	const char* title,
+	int width,
+	int height,
+	enum e_wintype wt,
+	struct t_glfw_winstate *wst
+);
+
 #endif
