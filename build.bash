@@ -21,9 +21,10 @@ main() {
 	window
 
 	matrix
+	shader
 	render
 
-	checkrun main_test $CC src/main.c obj/window.o obj/render.o obj/matrix.o $INCFLAGS $LFLAGS -o render
+	checkrun main_test $CC src/main.c obj/window.o obj/render.o obj/shader.o obj/matrix.o $INCFLAGS $LFLAGS -o render
 }
 
 window_test() {
@@ -41,6 +42,12 @@ matrix() {
 	checkrun matrix_test $CC src/matrix.c $INCFLAGS -c -o obj/matrix.o
 }
 
+shader_test() {
+	[ src/shader.c -nt render ]
+}
+shader() {
+	checkrun shader_test $CC src/shader.c $INCFLAGS -c -o obj/shader.o
+}
 
 render_test() {
 	[[ src/render.c -nt render || include/window.h -nt render ]]
