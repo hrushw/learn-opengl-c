@@ -1,10 +1,12 @@
 #include <math.h>
 
-#include "matrix.h"
-
 /* ---------------------- *
  * Matrix transformations *
  * ---------------------- */
+
+struct mat4x4f {
+	float arr[4][4];
+};
 
 const struct mat4x4f c_mat4x4f_identity = {{
 	{ 1.0, 0.0, 0.0, 0.0 },

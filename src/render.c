@@ -6,7 +6,9 @@
 #include <math.h>
 
 #include "window.h"
-#include "matrix.h"
+
+#include "matrix.c"
+#include "shader.c"
 
 /* References
  * OpenGL Tutorials (Victor Gordan) - https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-
@@ -21,15 +23,6 @@
 #define M_LEN(x) (sizeof(x) / sizeof(*x))
 
 enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
-
-unsigned int f_gl_genshader(const char* path, int type, char* chbuf, int chbufsz);
-
-unsigned int f_gl_genprogram_vf (
-	unsigned int vert,
-	unsigned int frag,
-	char* chbuf,
-	int chbufsz
-);
 
 /* xyz coordinates, rgb colors, texture coordinates  */
 const float vertices[] = {
