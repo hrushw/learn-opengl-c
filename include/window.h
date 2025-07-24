@@ -26,11 +26,16 @@ struct t_glfw_winstate {
 	double mx, my;
 	double time;
 	struct t_glfw_inputqueue iq;
-	int szrefresh;
-	int runstate;
+	int szrefresh, runstate;
 };
 
-void* f_glfw_initwin(const char* title, int width, int height);
+void* f_glfw_initwin (
+	struct t_glfw_winstate *wst,
+	const char* title,
+	int width,
+	int height,
+	enum e_wintype wt
+);
 void f_glfw_callback_error(int err, const char* desc);
 
 #endif

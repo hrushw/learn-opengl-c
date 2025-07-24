@@ -99,7 +99,7 @@ struct mat4x4f f_mat_rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f f_mat_perspective(
+struct mat4x4f f_mat_perspective (
 	double fov,
 	double sx, double sy,
 	double near, double far

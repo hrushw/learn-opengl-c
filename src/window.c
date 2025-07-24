@@ -8,7 +8,7 @@
 void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
-	if(
+	if (
 		q->start < 0 || q->start >= IQSZ_ ||
 		q->end < 0 || q->end >= 2*IQSZ_ ||
 		q->end - q->start >= IQSZ_ || q->start > q->end
@@ -35,7 +35,13 @@ void f_glfw_callback_error(int err, const char* desc) {
 /* Additionally store mouse coordinates into queue */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
-	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ key, action, mods, wst->mx, wst->my, wst->time });
+
+	struct t_glfw_inputevent e = {
+		key, action, mods,
+		wst->mx, wst->my, wst->time
+	};
+
+	f_iqappend(&wst->iq, e);
 
 	/* Scancode remains unused */
 	(void)scancode;
@@ -51,7 +57,13 @@ void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
-	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ button, action, mods, wst->mx, wst->my, wst->time });
+
+	struct t_glfw_inputevent e = {
+		button, action, mods,
+		wst->mx, wst->my, wst->time
+	};
+
+	f_iqappend(&wst->iq, e);
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */
@@ -94,8 +106,13 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 	return glfwCreateWindow(width, height, title, mon, NULL);
 }
 
-/* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
-void* f_glfw_initwin(const char* title, int width, int height) {
+void* f_glfw_initwin (
+	struct t_glfw_winstate *wst,
+	const char* title,
+	int width,
+	int height,
+	enum e_wintype wt
+) {
 	/* Initialize window with OpenGL 4.6 core context */
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -103,7 +120,8 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, GLFW_FALSE); /* ?? */
 
-	void* const win = f_glfw_crwin(title, width, height, WIN_DEF);
+	/* Create window */
+	void* const win = f_glfw_crwin(title, width, height, wt);
 	if(!win) return NULL;
 
 	/* Setup callback functions */
@@ -113,9 +131,16 @@ void* f_glfw_initwin(const char* title, int width, int height) {
 	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
-	glfwMakeContextCurrent(win); // Setup OpenGL context
-	glfwSwapInterval(1); // calls to glfwSwapBuffers() will only cause swap once per frame
+	/* Setup OpenGL context */
+	glfwMakeContextCurrent(win);
+
+	/* Calls to glfwSwapBuffers() will only cause swap once per monitor frame */
+	glfwSwapInterval(1);
+
+	/* Set window state pointer */
+	glfwGetFramebufferSize(win, &wst->width, &wst->height);
+	glfwSetWindowUserPointer(win, wst);
+
 	return win;
 }
-
 

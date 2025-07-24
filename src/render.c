@@ -123,14 +123,14 @@ void f_render_evalstate(struct t_glfw_winstate *wst) {
 	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
 
-		if(
+		if (
 			qev->key == GLFW_KEY_T &&
 			qev->mods == GLFW_MOD_CONTROL &&
 			qev->action == GLFW_RELEASE
 		)
 			glfwSetTime(0.0), wst->time = 0.0;
 
-		if(
+		if (
 			qev->key == GLFW_KEY_Q &&
 			qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) &&
 			qev->action == GLFW_RELEASE
