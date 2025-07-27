@@ -21,7 +21,6 @@
 
 enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
 
-
 /* Read file into buffer */
 /* No longer causes program exit on failure */
 /* Returns length 0 on any failure, always null terminated */
@@ -37,7 +36,10 @@ void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
 	else if( (l = ftell(f)) < 0 )
 		fprintf(stderr, "ERROR: Failed to get size of file '%s'\n", path);
 	else if( l > buflen - 1 )
-		fprintf(stderr, "ERROR: File '%s' too large!\n(max size = %d bytes)\n", path, buflen - 1);
+		fprintf(stderr,
+			"ERROR: File '%s' too large!\n"
+			"(max size = %d bytes)\n",
+		path, buflen - 1);
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
 	else goto finish;
@@ -118,7 +120,8 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, 
 	return sp;
 }
 
-/* Evaluate keyboard and mouse events - currently handles shortcuts for resetting time and exit */
+/* Evaluate keyboard and mouse events */
+/* Currently handles shortcuts for resetting time and exit */
 void f_render_evalstate(struct t_glfw_winstate *wst) {
 	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
@@ -393,7 +396,8 @@ void f_render_main(void* win) {
 	glUseProgram(sp);
 
 	const int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0) fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
+	if(transformloc < 0)
+		fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
 
 	f_render_init();
 	f_render_loop(win, transformloc);

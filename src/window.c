@@ -36,11 +36,13 @@ void f_glfw_callback_error(int err, const char* desc) {
 	fprintf(stderr, "GLFW Error: \n%s\n(Error code - %d)\n", desc, err);
 }
 
-/* Key callback: simply add pressed key to queue for evaluation, immediately exit on queue overflow */
+/* Key callback: add pressed key to queue for evaluation */
+/* Immediately exits on queue overflow */
 /* Additionally store mouse coordinates into queue */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
-	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ key, action, mods, wst->mx, wst->my, wst->time });
+	struct t_glfw_inputevent e = { key, action, mods, wst->mx, wst->my, wst->time }
+	f_iqappend(&wst->iq, e)
 
 	/* Scancode remains unused */
 	(void)scancode;
@@ -56,7 +58,9 @@ void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 /* (this assumes mouse clicks and keypresses have distinct keycodes) */
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
-	f_iqappend(&wst->iq, (struct t_glfw_inputevent){ button, action, mods, wst->mx, wst->my, wst->time });
+
+	struct t_glfw_inputevent e = { button, action, mods, wst->mx, wst->my, wst->time }
+	f_iqappend(&wst->iq, e);
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */
@@ -100,7 +104,7 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 	return glfwCreateWindow(width, height, title, mon, NULL);
 }
 
-/* Initialize glfw, create window, set callback functions, initialize OpenGL context, global GLFW settings */
+/* Create and initialize GLFW window */
 void* f_glfw_initwin (
 	const char* title,
 	int width,
