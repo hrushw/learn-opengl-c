@@ -5,7 +5,7 @@
 
 #include "window.h"
 
-/* Append to queue - bounds check merged with function */
+/* Append input events to queue to handle later */
 void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
@@ -31,14 +31,13 @@ void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
  * GLFW Callback functions *
  * ----------------------- */
 
-/* Immediately exit on any error encountered by GLFW */
+/* Log errors */
 void f_glfw_callback_error(int err, const char* desc) {
 	fprintf(stderr, "GLFW Error: \n%s\n(Error code - %d)\n", desc, err);
 }
 
 /* Key callback: add pressed key to queue for evaluation */
-/* Immediately exits on queue overflow */
-/* Additionally store mouse coordinates into queue */
+/* Additionally store mouse coordinates */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 

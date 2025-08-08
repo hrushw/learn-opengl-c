@@ -17,17 +17,23 @@ struct t_glfw_winstate ws = {
 	.runstate = 1,
 };
 
-/* Main function */
+/* Attempt initialization of GLFW and the window, exit if unsuccessful */
 int main(void) {
+	int status = 0;
+
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 
 	void* const win = f_glfw_initwin("Tetrahedron", 640, 480, WIN_DEF, &ws);
-	if(!win) goto end;
+	if(!win) {
+		status = -2;
+		goto end;
+	}
 
 	f_render_main(win);
 
 	glfwDestroyWindow(win);
+
 	end: glfwTerminate();
-	return 0;
+	return status;
 }
