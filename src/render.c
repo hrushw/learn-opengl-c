@@ -246,18 +246,28 @@ struct mat4x4f f_mat_rotatez(double angle) {
 	}};
 }
 
-struct mat4x4f f_mat_perspective(double fov, double sx, double sy, double near, double far) {
+struct mat4x4f f_mat_perspective(double fov, double near, double far) {
 	const double zscale = (near + far)/(far - near);
 	const double ztrans = 2*near*far/(near - far);
 	const float sp = 1.0/tanf(fov/2.0);
 
 	return (struct mat4x4f) {{
-		{ sp/sx,   0.0,    0.0,    0.0 },
-		{   0.0, sp/sy,    0.0,    0.0 },
-		{   0.0,   0.0, zscale, ztrans },
-		{   0.0,   0.0,    1.0,    0.0 },
+		{  sp, 0.0,    0.0,    0.0 },
+		{ 0.0,  sp,    0.0,    0.0 },
+		{ 0.0, 0.0, zscale, ztrans },
+		{ 0.0, 0.0,    1.0,    0.0 },
 	}};
 }
+
+enum e_transform_type {
+	MAT_TRANSLATE,
+	MAT_PERSPECTIVE,
+	MAT_SCALE3D,
+	MAT_SCALE,
+	MAT_ROTATEX,
+	MAT_ROTATEY,
+	MAT_ROTATEZ,
+};
 
 /* xyz coordinates, rgb colors, texture coordinates  */
 const float vertices[] = {
@@ -317,6 +327,7 @@ void f_render_loop(void* win, int transformloc) {
 	 * fixed function stage in OpenGL scales all vectors down by w */
 	struct mat4x4f transforms[] = {
 		c_mat4x4f_identity,
+		f_mat_perspective(M_PI/3.0, 1.0, 6.0),
 		f_mat_translate(0.6f, 0.0f, 2.0f),
 		c_mat4x4f_identity,
 		f_mat_translate(0.4f, 0.1f, 0.0f),
@@ -338,12 +349,12 @@ void f_render_loop(void* win, int transformloc) {
 			else
 				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
 
-			transforms[0] = f_mat_perspective(M_PI/3.0, scalex, scaley, 1.0, 6.0);
+			transforms[0] = f_mat_scale3d(1.0/scalex, 1.0/scaley, 1.0);
 		}
 
-		transforms[2] = f_mat_rotatez(wst->time);
-		transforms[5] = f_mat_rotatez(-wst->time);
-		transforms[6] = f_mat_rotatey(3*wst->time);
+		transforms[3] = f_mat_rotatez(wst->time);
+		transforms[6] = f_mat_rotatez(-wst->time);
+		transforms[7] = f_mat_rotatey(3*wst->time);
 
 		const struct mat4x4f tf = f_mat_multiplylist(transforms, M_LEN(transforms));
 
