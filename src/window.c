@@ -41,8 +41,9 @@ void f_glfw_callback_error(int err, const char* desc) {
 /* Additionally store mouse coordinates into queue */
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
-	struct t_glfw_inputevent e = { key, action, mods, wst->mx, wst->my, wst->time }
-	f_iqappend(&wst->iq, e)
+
+	struct t_glfw_inputevent e = { key, action, mods, wst->mx, wst->my, wst->time };
+	f_iqappend(&wst->iq, e);
 
 	/* Scancode remains unused */
 	(void)scancode;
@@ -59,7 +60,7 @@ void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
-	struct t_glfw_inputevent e = { button, action, mods, wst->mx, wst->my, wst->time }
+	struct t_glfw_inputevent e = { button, action, mods, wst->mx, wst->my, wst->time };
 	f_iqappend(&wst->iq, e);
 }
 
