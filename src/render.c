@@ -227,12 +227,9 @@ void f_render_loop(void* win, int transformloc) {
 			transforms[0] = f_mat_scale3d(scalex, scaley, 1.0);
 		}
 
-		struct quaternion zrotq = (struct quaternion) {
-			0, 0, sin(0.5*wst->time), cos(0.5*wst->time)
-		};
-
-		// transforms[3] = f_mat_rotatez(wst->time);
-		transforms[3] = f_mat_quaternion_rotate(zrotq);
+		transforms[3] = f_mat_quaternion_rotate( (struct quaternion)
+			{0, 0, sin(0.5*wst->time), cos(0.5*wst->time)}
+		);
 		transforms[6] = f_mat_rotatez(-wst->time);
 		transforms[7] = f_mat_rotatey(3*wst->time);
 
