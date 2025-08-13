@@ -1,13 +1,9 @@
 #include <math.h>
+#include "vector.h"
 
 /* ---------------------- *
  * Matrix transformations *
  * ---------------------- */
-
-/* OpenGL floating point inputs are assumed to always be 32 bit */
-struct mat4x4f {
-	float arr[4][4];
-};
 
 const struct mat4x4f c_mat4x4f_identity = {{
 	{ 1.0, 0.0, 0.0, 0.0 },
@@ -22,6 +18,7 @@ const struct mat4x4f c_mat4x4f_zero = {{
 	{ 0.0, 0.0, 0.0, 0.0 },
 	{ 0.0, 0.0, 0.0, 0.0 },
 }};
+
 
 struct mat4x4f f_mat_multiply(struct mat4x4f a, struct mat4x4f b) {
 	struct mat4x4f out = c_mat4x4f_zero;
@@ -52,10 +49,6 @@ struct mat4x4f f_mat_scale3d(float x, float y, float z) {
 		{ 0.0, 0.0,   z, 0.0 },
 		{ 0.0, 0.0, 0.0, 1.0 },
 	}};
-}
-
-static inline struct mat4x4f f_mat_scale(float s) {
-	return f_mat_scale3d(s, s, s);
 }
 
 struct mat4x4f f_mat_translate(float x, float y, float z) {
@@ -114,10 +107,6 @@ struct mat4x4f f_mat_perspective(double fov, double near, double far) {
 		{ 0.0, 0.0,    1.0,    0.0 },
 	}};
 }
-
-struct quaternion {
-	double x, y, z, w;
-};
 
 struct quaternion f_quat_conjugate(struct quaternion q) {
 	return (struct quaternion) {-q.x, -q.y, -q.z, q.w};
