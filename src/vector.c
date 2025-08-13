@@ -41,7 +41,6 @@ struct mat4x4f f_mat_multiplylist(struct mat4x4f *m, int n) {
 	return out;
 }
 
-
 struct mat4x4f f_mat_scale3d(float x, float y, float z) {
 	return (struct mat4x4f){{
 		{   x, 0.0, 0.0, 0.0 },
@@ -95,6 +94,15 @@ struct mat4x4f f_mat_rotatez(double angle) {
 	}};
 }
 
+/* Perspective projection transformation - transform camera view frustum into OpenGL rendering box */
+/* The complete transformation required for this is not linear,
+ * OpenGL has an extra fixed function 'perspective division' stage
+ * where all coordinates are divided by the w value.
+ *
+ * This function should be applied only once as the last transformation,
+ * or before a scaling transformation
+ */
+
 struct mat4x4f f_mat_perspective(double fov, double near, double far) {
 	const double zscale = (near + far)/(far - near);
 	const double ztrans = 2*near*far/(near - far);
@@ -112,6 +120,7 @@ struct quaternion f_quat_conjugate(struct quaternion q) {
 	return (struct quaternion) {-q.x, -q.y, -q.z, q.w};
 }
 
+/* Matrix associated with quaternion multiplication : q*p */
 struct mat4x4f f_mat_quaternion_apply(struct quaternion q) {
 	return (struct mat4x4f) {{
 		{  q.w, -q.z,  q.y, q.x },
@@ -121,6 +130,7 @@ struct mat4x4f f_mat_quaternion_apply(struct quaternion q) {
 	}};
 }
 
+/* Matrix associated with quaternion multiplication (in reverse) : p*q */
 struct mat4x4f f_mat_quaternion_apply_rev(struct quaternion q) {
 	return (struct mat4x4f) {{
 		{  q.w,  q.z, -q.y, q.x },
@@ -130,10 +140,12 @@ struct mat4x4f f_mat_quaternion_apply_rev(struct quaternion q) {
 	}};
 }
 
+/* The resultant matrix happens to be the same regardless of order of multiplication */
+/* This can definitely be optimized better, for now leaving it in a more understandable form */
 struct mat4x4f f_mat_quaternion_rotate(struct quaternion q) {
 	return f_mat_multiply(
-		f_mat_quaternion_apply_rev(f_quat_conjugate(q)),
-		f_mat_quaternion_apply(q)
+		f_mat_quaternion_apply(q),
+		f_mat_quaternion_apply_rev(f_quat_conjugate(q))
 	);
 }
 

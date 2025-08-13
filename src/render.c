@@ -200,8 +200,6 @@ void f_render_init(void) {
 void f_render_loop(void* win, int transformloc) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(win);
 
-	/* Projection matrix must be applied last - *
-	 * fixed function stage in OpenGL scales all vectors down by w */
 	struct mat4x4f transforms[] = {
 		c_mat4x4f_identity,
 		f_mat_perspective(M_PI/3.0, 1.0, 6.0),
@@ -222,11 +220,11 @@ void f_render_loop(void* win, int transformloc) {
 
 			double scalex, scaley;
 			if(wst->width > wst->height)
-				scalex = (double)wst->width / (double)wst->height, scaley = 1.0;
+				scalex = (double)wst->height / (double)wst->width, scaley = 1.0;
 			else
-				scalex = 1.0, scaley = (double)wst->height / (double)wst->width;
+				scalex = 1.0, scaley = (double)wst->width / (double)wst->height;
 
-			transforms[0] = f_mat_scale3d(1.0/scalex, 1.0/scaley, 1.0);
+			transforms[0] = f_mat_scale3d(scalex, scaley, 1.0);
 		}
 
 		struct quaternion zrotq = (struct quaternion) {
