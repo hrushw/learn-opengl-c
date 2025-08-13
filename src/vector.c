@@ -116,6 +116,11 @@ struct mat4x4f f_mat_perspective(double fov, double near, double far) {
 	}};
 }
 
+struct quaternion f_quat_rotate(double x, double y, double z, double angle) {
+	double s = sin(angle/2)/sqrt(x*x + y*y + z*z);
+	return (struct quaternion) {s*x, s*y, s*z, cos(angle/2)};
+}
+
 struct quaternion f_quat_conjugate(struct quaternion q) {
 	return (struct quaternion) {-q.x, -q.y, -q.z, q.w};
 }

@@ -9,13 +9,13 @@
 #include "vector.h"
 
 /* References
- * OpenGL Tutorials (Victor Gordan) - https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-
- * OpenGL for Beginners (OGLDEV) - https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA
- * LearnOpenGL (Camera) - https://learnopengl.com/Getting-started/Camera
+ * OpenGL Tutorials (Victor Gordan) - "https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-"
+ * OpenGL for Beginners (OGLDEV) - "https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA"
+ * LearnOpenGL (Camera) - "https://learnopengl.com/Getting-started/Camera"
 
- * OpenGL 4.6 specification - https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf
- * GLFW documentation [window guide] - https://www.glfw.org/docs/latest/window_guide.html
- * OpenGL wiki [Rendering Pipeline Overview] - https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview
+ * OpenGL 4.6 specification - "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
+ * GLFW documentation [window guide] - "https://www.glfw.org/docs/latest/window_guide.html"
+ * OpenGL wiki [Rendering Pipeline Overview] - "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
  */
 
 #define M_LEN(x) (sizeof(x) / sizeof(*x))
@@ -227,9 +227,9 @@ void f_render_loop(void* win, int transformloc) {
 			transforms[0] = f_mat_scale3d(scalex, scaley, 1.0);
 		}
 
-		transforms[3] = f_mat_quaternion_rotate( (struct quaternion)
-			{0, 0, sin(0.5*wst->time), cos(0.5*wst->time)}
-		);
+		transforms[3] = f_mat_quaternion_rotate(f_quat_rotate(
+			0, 0, 1, wst->time
+		));
 		transforms[6] = f_mat_rotatez(-wst->time);
 		transforms[7] = f_mat_rotatey(3*wst->time);
 
