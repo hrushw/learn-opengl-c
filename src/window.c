@@ -41,7 +41,11 @@ void f_glfw_callback_error(int err, const char* desc) {
 void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
-	struct t_glfw_inputevent e = { key, action, mods, wst->mx, wst->my, wst->time };
+	struct t_glfw_inputevent e = {
+		IEV_KEYPRESS,
+		{ .key_ev = { key, action, mods } },
+		wst->mx, wst->my, wst->time
+	};
 	f_iqappend(&wst->iq, e);
 
 	/* Scancode remains unused */
@@ -59,7 +63,22 @@ void f_glfw_callback_cursorpos(GLFWwindow *window, double x, double y) {
 void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int mods) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
-	struct t_glfw_inputevent e = { button, action, mods, wst->mx, wst->my, wst->time };
+	struct t_glfw_inputevent e = {
+		IEV_MOUSEBUTTON,
+		{ .mb_ev = { button, action, mods } },
+		wst->mx, wst->my, wst->time
+	};
+	f_iqappend(&wst->iq, e);
+}
+
+void f_glfw_callback_scroll(GLFWwindow* window, double xoffset, double yoffset) {
+	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
+	struct t_glfw_inputevent e = {
+		IEV_SCROLL,
+		{ .scroll_ev = { xoffset, yoffset } },
+		wst->mx, wst->my, wst->time
+	};
+
 	f_iqappend(&wst->iq, e);
 }
 
@@ -126,11 +145,12 @@ void* f_glfw_initwin (
 	glfwSetKeyCallback(win, f_glfw_callback_key);
 	glfwSetCursorPosCallback(win, f_glfw_callback_cursorpos);
 	glfwSetMouseButtonCallback(win, f_glfw_callback_mouseclick);
+	glfwSetScrollCallback(win, f_glfw_callback_scroll);
 	glfwSetFramebufferSizeCallback(win, f_glfw_callback_fbresize);
 	glfwSetWindowCloseCallback(win, f_glfw_callback_winclose);
 
 	/* Setup OpenGL context */
-	glfwMakeContextCurrent(win); 
+	glfwMakeContextCurrent(win);
 
 	/* Calls to glfwSwapBuffers() will only cause swap once per frame */
 	glfwSwapInterval(1);

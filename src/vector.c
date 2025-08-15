@@ -126,7 +126,7 @@ struct quaternion f_quat_conjugate(struct quaternion q) {
 }
 
 /* Matrix associated with quaternion multiplication : q*p */
-struct mat4x4f f_mat_quaternion_apply(struct quaternion q) {
+struct mat4x4f f_mat_quat_apply(struct quaternion q) {
 	return (struct mat4x4f) {{
 		{  q.w, -q.z,  q.y, q.x },
 		{  q.z,  q.w, -q.x, q.y },
@@ -136,7 +136,7 @@ struct mat4x4f f_mat_quaternion_apply(struct quaternion q) {
 }
 
 /* Matrix associated with quaternion multiplication (in reverse) : p*q */
-struct mat4x4f f_mat_quaternion_apply_rev(struct quaternion q) {
+struct mat4x4f f_mat_quat_apply_rev(struct quaternion q) {
 	return (struct mat4x4f) {{
 		{  q.w,  q.z, -q.y, q.x },
 		{ -q.z,  q.w,  q.x, q.y },
@@ -147,10 +147,10 @@ struct mat4x4f f_mat_quaternion_apply_rev(struct quaternion q) {
 
 /* The resultant matrix happens to be the same regardless of order of multiplication */
 /* This can definitely be optimized better, for now leaving it in a more understandable form */
-struct mat4x4f f_mat_quaternion_rotate(struct quaternion q) {
+struct mat4x4f f_mat_quat_rotate(struct quaternion q) {
 	return f_mat_multiply(
-		f_mat_quaternion_apply(q),
-		f_mat_quaternion_apply_rev(f_quat_conjugate(q))
+		f_mat_quat_apply(q),
+		f_mat_quat_apply_rev(f_quat_conjugate(q))
 	);
 }
 

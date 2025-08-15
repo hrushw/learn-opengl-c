@@ -24,7 +24,7 @@ struct mat4x4f f_mat_rotatez(double);
 struct mat4x4f f_mat_perspective(double, double, double);
 
 struct quaternion f_quat_rotate(double, double, double, double);
-struct mat4x4f f_mat_quaternion_rotate(struct quaternion);
+struct mat4x4f f_mat_quat_rotate(struct quaternion);
 
 static inline struct mat4x4f f_mat_scale(float s) {
 	return f_mat_scale3d(s, s, s);

@@ -121,25 +121,43 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, 
 	return sp;
 }
 
+
 /* Evaluate keyboard and mouse events */
 /* Currently handles shortcuts for resetting time and exit */
+void f_render_evalstate_key(struct t_glfw_winstate *wst, struct t_glfw_inputevent *e) {
+	struct t_glfw_inputevent_key *kev = &e->ev.key_ev;
+
+	if(
+		kev->key == GLFW_KEY_T &&
+		kev->mods == GLFW_MOD_CONTROL &&
+		kev->action == GLFW_RELEASE
+	)
+		glfwSetTime(0.0), wst->time = 0.0;
+
+	else if(
+		kev->key == GLFW_KEY_Q &&
+		kev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) &&
+		kev->action == GLFW_RELEASE
+	)
+		wst->runstate = 0;
+}
+
 void f_render_evalstate(struct t_glfw_winstate *wst) {
 	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
 
-		if(
-			qev->key == GLFW_KEY_T &&
-			qev->mods == GLFW_MOD_CONTROL &&
-			qev->action == GLFW_RELEASE
-		)
-			glfwSetTime(0.0), wst->time = 0.0;
+		switch(qev->type) {
+		case IEV_KEYPRESS:
+			f_render_evalstate_key(wst, qev);
+			break;
 
-		if(
-			qev->key == GLFW_KEY_Q &&
-			qev->mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT) &&
-			qev->action == GLFW_RELEASE
-		)
-			wst->runstate = 0;
+		case IEV_SCROLL:
+			// printf("SCROLLING: %.4lf %.4lf\n", qev->ev.scroll_ev.sx, qev->ev.scroll_ev.sy);
+			break;
+
+		case IEV_MOUSEBUTTON:
+			break;
+		}
 	}
 
 	/* Reset queue after evaluation */
@@ -227,7 +245,7 @@ void f_render_loop(void* win, int transformloc) {
 			transforms[0] = f_mat_scale3d(scalex, scaley, 1.0);
 		}
 
-		transforms[3] = f_mat_quaternion_rotate(f_quat_rotate(
+		transforms[3] = f_mat_quat_rotate(f_quat_rotate(
 			0, 0, 1, wst->time
 		));
 		transforms[6] = f_mat_rotatez(-wst->time);

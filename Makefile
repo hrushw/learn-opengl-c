@@ -1,4 +1,4 @@
-CC = gcc -Wall -Wextra -Wpedantic -Wvla -I ./include
+CC = gcc -Wall -Wextra -Wpedantic -Wswitch -Wvla -I ./include
 LFLAGS = -lglfw -lm -lepoxy
 
 render: obj/vector.o obj/render.o obj/window.o obj/main.o
