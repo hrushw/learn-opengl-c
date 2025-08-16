@@ -46,6 +46,7 @@ void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, 
 		{ .key_ev = { key, action, mods } },
 		wst->mx, wst->my, wst->time
 	};
+
 	f_iqappend(&wst->iq, e);
 
 	/* Scancode remains unused */
@@ -68,11 +69,14 @@ void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int 
 		{ .mb_ev = { button, action, mods } },
 		wst->mx, wst->my, wst->time
 	};
+
 	f_iqappend(&wst->iq, e);
 }
 
+/* Scroll callback: add event to queue */
 void f_glfw_callback_scroll(GLFWwindow* window, double xoffset, double yoffset) {
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
+
 	struct t_glfw_inputevent e = {
 		IEV_SCROLL,
 		{ .scroll_ev = { xoffset, yoffset } },
@@ -160,5 +164,4 @@ void* f_glfw_initwin (
 
 	return win;
 }
-
 

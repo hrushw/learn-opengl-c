@@ -9,13 +9,25 @@
 #include "vector.h"
 
 /* References
- * OpenGL Tutorials (Victor Gordan) - "https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-"
- * OpenGL for Beginners (OGLDEV) - "https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA"
- * LearnOpenGL (Camera) - "https://learnopengl.com/Getting-started/Camera"
+ * ----------
 
- * OpenGL 4.6 specification - "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
- * GLFW documentation [window guide] - "https://www.glfw.org/docs/latest/window_guide.html"
- * OpenGL wiki [Rendering Pipeline Overview] - "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
+ * OpenGL Tutorials (Victor Gordan)
+ * "https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-"
+
+ * OpenGL for Beginners (OGLDEV)
+ * "https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA"
+
+ * LearnOpenGL (Camera)
+ * "https://learnopengl.com/Getting-started/Camera"
+
+ * OpenGL 4.6 specification
+ * "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
+
+ * GLFW documentation [window guide]
+ * "https://www.glfw.org/docs/latest/window_guide.html"
+
+ * OpenGL wiki [Rendering Pipeline Overview]
+ * "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
  */
 
 #define M_LEN(x) (sizeof(x) / sizeof(*x))
@@ -315,5 +327,4 @@ void f_render_main(void* win) {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteProgram(sp);
 }
-
 

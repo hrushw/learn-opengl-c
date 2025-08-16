@@ -2,7 +2,7 @@
 #define __H__VECTOR_H___
 
 /* OpenGL floating point inputs are assumed to always be 32 bit */
-/* This might not work on all machines */
+/* Loss of accuracy from floating point multiplication may accumulate to high amounts */
 struct mat4x4f {
 	float arr[4][4];
 };
