@@ -104,7 +104,7 @@ void* f_glfw_crwin(const char* title, int width, int height, enum e_wintype type
 	GLFWmonitor* mon = glfwGetPrimaryMonitor();
 	if(!mon) return NULL;
 
-	const GLFWvidmode* const mode = glfwGetVideoMode(mon);
+	const GLFWvidmode* mode = glfwGetVideoMode(mon);
 	if(!mode) return NULL;
 
 	switch(type) {

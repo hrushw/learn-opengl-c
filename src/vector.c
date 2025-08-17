@@ -60,8 +60,8 @@ struct mat4x4f f_mat_translate(float x, float y, float z) {
 }
 
 struct mat4x4f f_mat_rotatex(double angle) {
-	const float c = cos(angle);
-	const float s = sin(angle);
+	float c = cos(angle);
+	float s = sin(angle);
 
 	return (struct mat4x4f) {{
 		{ 1.0, 0.0, 0.0, 0.0 },
@@ -72,8 +72,8 @@ struct mat4x4f f_mat_rotatex(double angle) {
 }
 
 struct mat4x4f f_mat_rotatey(double angle) {
-	const float c = cos(angle);
-	const float s = sin(angle);
+	float c = cos(angle);
+	float s = sin(angle);
 
 	return (struct mat4x4f) {{
 		{   c, 0.0,   s, 0.0 },
@@ -84,8 +84,8 @@ struct mat4x4f f_mat_rotatey(double angle) {
 }
 
 struct mat4x4f f_mat_rotatez(double angle) {
-	const float c = cos(angle);
-	const float s = sin(angle);
+	float c = cos(angle);
+	float s = sin(angle);
 	return (struct mat4x4f) {{
 		{   c,  -s, 0.0, 0.0 },
 		{   s,   c, 0.0, 0.0 },
@@ -104,9 +104,9 @@ struct mat4x4f f_mat_rotatez(double angle) {
  */
 
 struct mat4x4f f_mat_perspective(double fov, double near, double far) {
-	const double zscale = (near + far)/(far - near);
-	const double ztrans = 2*near*far/(near - far);
-	const float sp = 1.0/tanf(fov/2.0);
+	double zscale = (near + far)/(far - near);
+	double ztrans = 2*near*far/(near - far);
+	float sp = 1.0/tanf(fov/2.0);
 
 	return (struct mat4x4f) {{
 		{  sp, 0.0,    0.0,    0.0 },

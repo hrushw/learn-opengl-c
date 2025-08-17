@@ -38,7 +38,7 @@ enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
 /* No longer causes program exit on failure */
 /* Returns length 0 on any failure, always null terminated */
 void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
-	FILE* const f = fopen(path, "rb");
+	FILE* f = fopen(path, "rb");
 	long l = 0;
 
 	if(!f) {
@@ -92,7 +92,7 @@ unsigned int f_gl_genshader(const char* path, int type, char* chbuf, int chbufsz
 	int len = 0;
 	f_io_filetobuf(path, &len, chbuf, chbufsz);
 
-	const unsigned int s = glCreateShader(type);
+	unsigned int s = glCreateShader(type);
 	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
 	glCompileShader(s);
 
@@ -263,7 +263,7 @@ void f_render_loop(void* win, int transformloc) {
 		transforms[6] = f_mat_rotatez(-wst->time);
 		transforms[7] = f_mat_rotatey(3*wst->time);
 
-		const struct mat4x4f tf = f_mat_multiplylist(transforms, M_LEN(transforms));
+		struct mat4x4f tf = f_mat_multiplylist(transforms, M_LEN(transforms));
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glUniformMatrix4fv(transformloc, 1, GL_TRUE, &(tf.arr[0][0]));
@@ -278,9 +278,9 @@ void f_render_loop(void* win, int transformloc) {
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	static char chbuf[CHBUFSZ_] = {0};
 
-	const unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
-	const unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
-	const unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
+	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
+	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
+	unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
@@ -310,10 +310,10 @@ void f_render_main(void* win) {
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
 
-	const unsigned int sp = f_render_genprogram("shaders/vertex.glsl", "shaders/fragment.glsl");
+	unsigned int sp = f_render_genprogram("shaders/vertex.glsl", "shaders/fragment.glsl");
 	glUseProgram(sp);
 
-	const int transformloc = glGetUniformLocation(sp, "transform");
+	int transformloc = glGetUniformLocation(sp, "transform");
 	if(transformloc < 0)
 		fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
 

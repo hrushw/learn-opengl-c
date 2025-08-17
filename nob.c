@@ -1,6 +1,7 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
+#include <limits.h>
 #include <string.h>
 
 #define _LEN(x) (sizeof ((x))/ sizeof (*(x)))
@@ -12,20 +13,42 @@
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
+void _check_assert(int assertion, char* name) {
+	if(assertion)
+		printf("[Assertion] %s : passed, continuing...\n", name);
+	else
+		printf("[Assertion] %s : FAILED! Exiting...\n", name), exit(-1);
+}
+
+#define chk_assert(x) _check_assert(x, #x)
+
 int main(int argc, char* argv[]) {
-	NOB_GO_REBUILD_URSELF(argc, argv);
+	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h");
+
 	Nob_Cmd cmd = {0};
 
 	if(argc > 1) {
 		if(!strcmp(argv[1], "clean")) {
 			nob_cmd_append(&cmd, "rm", "-f", "render", M_OBJS);
-			if(nob_cmd_run_sync_and_reset(&cmd)) return -1;
+			if(nob_cmd_run_sync(cmd)) return -1;
+			return 0;
+		} else if(!strcmp(argv[1], "run")) {
+			nob_cmd_append(&cmd, "./render");
+			if(nob_cmd_run_sync(cmd)) return -1;
 			return 0;
 		} else {
-			printf("Invalid option '%s'\n", argv[1]);
+			nob_log(NOB_ERROR, "Invalid option '%s'", argv[1]);
+			return -1;
 		}
 	}
 
+	/* Bit width checks for OpenGL */
+	putchar('\n');
+	chk_assert(sizeof(float) == 4);
+	chk_assert(CHAR_BIT == 8);
+	putchar('\n');
+
+	/* Check for updates and recompile object files */
 	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/main.c", "-o", "obj/main.o");
 	if(CHECK_REBUILD("obj/main.o", "src/main.c", "include/window.h")) {
 		if(!nob_cmd_run_sync(cmd)) return -1;
@@ -50,6 +73,7 @@ int main(int argc, char* argv[]) {
 	}
 	cmd.count = 0;
 
+	/* Recompile final executable from objects */
 	nob_cmd_append(&cmd, M_CC, M_LFLAGS, M_OBJS, "-o", "render");
 	if(CHECK_REBUILD("render", M_OBJS)) {
 		if(!nob_cmd_run_sync(cmd)) return -1;
