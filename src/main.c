@@ -5,6 +5,13 @@
 
 void f_render_main(void* win);
 
+void f_glfw_callback_error(int, const char*);
+
+void* f_glfw_initwin (
+	const char*, int, int,
+	enum e_wintype, struct t_glfw_winstate *
+);
+
 struct t_glfw_winstate ws = {
 	.width = 0, .height = 0,
 	.mx = 0, .my = 0,

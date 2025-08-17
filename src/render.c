@@ -37,7 +37,12 @@ enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
 /* Read file into buffer */
 /* No longer causes program exit on failure */
 /* Returns length 0 on any failure, always null terminated */
-void f_io_filetobuf(const char* path, int* len, char* buf, int buflen) {
+void f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
+	if(buflen == 0) {
+		fprintf(stderr, "Buffer too small!\n");
+		return;
+	}
+
 	FILE* f = fopen(path, "rb");
 	long l = 0;
 
@@ -88,7 +93,7 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 }
 
 /* Generate shader from file path - general function */
-unsigned int f_gl_genshader(const char* path, int type, char* chbuf, int chbufsz) {
+unsigned int f_gl_genshader(const char* path, int type, char* chbuf, unsigned int chbufsz) {
 	int len = 0;
 	f_io_filetobuf(path, &len, chbuf, chbufsz);
 
@@ -155,7 +160,7 @@ void f_render_evalstate_key(struct t_glfw_winstate *wst, struct t_glfw_inputeven
 }
 
 void f_render_evalstate(struct t_glfw_winstate *wst) {
-	for(int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
+	for(unsigned int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
 
 		switch(qev->type) {

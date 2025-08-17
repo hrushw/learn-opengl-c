@@ -10,9 +10,8 @@ void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
 	/* Bounds check for queue just in case */
 	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
 	if(
-		q->start < 0 || q->start >= IQSZ_ ||
-		q->end < 0 || q->end >= 2*IQSZ_ ||
-		q->end - q->start >= IQSZ_ || q->start > q->end
+		q->start >= IQSZ_ || q->end >= 2*IQSZ_ ||
+		q->end >= IQSZ_ + q->start || q->start > q->end
 	) {
 		/* If bounds check fails, log error and reset the queue */
 		fprintf(stderr,
