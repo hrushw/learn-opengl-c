@@ -42,10 +42,12 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	/* Bit width checks for OpenGL */
 	putchar('\n');
+
+	/* Bit width checks for OpenGL */
 	chk_assert(sizeof(float) == 4);
 	chk_assert(CHAR_BIT == 8);
+
 	putchar('\n');
 
 	/* Check for updates and recompile object files */

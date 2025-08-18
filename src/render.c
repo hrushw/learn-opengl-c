@@ -32,44 +32,63 @@
 
 #define M_LEN(x) (sizeof(x) / sizeof(*x))
 
-enum e_chbufsz_ { CHBUFSZ_ = 0x10000 };
+enum e_chbufsz_ { CHBUFSZ_ = 0x40000 };
+char g_chbuf[CHBUFSZ_];
+
+enum e_filetobuf_errors {
+	ERR_F2B_SUCCESS = 0,
+
+	ERR_F2B_ZERO_SIZE_BUFFER,
+	ERR_F2B_FAILED_OPEN,
+	ERR_F2B_FAILED_SEEK,
+	ERR_F2B_FAILED_GET_SIZE,
+	ERR_F2B_BUFFER_TOO_SMALL,
+	ERR_F2B_FAILED_READ,
+	ERR_F2B_FAILED_CLOSE,
+};
 
 /* Read file into buffer */
 /* No longer causes program exit on failure */
-/* Returns length 0 on any failure, always null terminated */
-void f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
+/* Sets length to 0 on any failure, always null terminated */
+int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
 	if(buflen == 0) {
-		fprintf(stderr, "Buffer too small!\n");
-		return;
+		return ERR_F2B_ZERO_SIZE_BUFFER;
 	}
 
+	/* Open file */
 	FILE* f = fopen(path, "rb");
 	long l = 0;
+	int ret = ERR_F2B_SUCCESS;
 
-	if(!f) {
-		fprintf(stderr, "ERROR: Failed to open file '%s'!\n", path);
-		return;
-	} else if( fseek(f, 0L, SEEK_END) == -1 )
-		fprintf(stderr, "ERROR: Failed to seek to end of file '%s'!\n", path);
+	/* Attempts in order: */
+	/* 1 . Check if file opened successfully */
+	/* 2 . Seek to end of file */
+	/* 3 . Get file size */
+	/* 4 . Check if buffer is large enough to store the file */
+	/* 5 . Seek to start of file and read contents into buffer */
+
+	if(!f)
+		return ERR_F2B_FAILED_OPEN;
+	else if( fseek(f, 0L, SEEK_END) == -1 )
+		ret = ERR_F2B_FAILED_SEEK;
 	else if( (l = ftell(f)) < 0 )
-		fprintf(stderr, "ERROR: Failed to get size of file '%s'\n", path);
+		ret = ERR_F2B_FAILED_GET_SIZE;
 	else if( l > buflen - 1 )
-		fprintf(stderr,
-			"ERROR: File '%s' too large!\n"
-			"(max size = %d bytes)\n",
-		path, buflen - 1);
+		ret = ERR_F2B_BUFFER_TOO_SMALL;
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
-		fprintf(stderr, "ERROR: Error occured while reading file '%s'!\n", path);
-	else goto finish;
+		ret = ERR_F2B_FAILED_READ;
+	else goto end;
 
-	/* On any read failures return empty string */
+	/* If any of the above fails return empty string */
 	l = 0;
 
 	/* Always return null-terminated string */
-	finish:
+	end:
 	buf[l] = 0;
 	if(len) *len = l;
-	if(fclose(f)) fprintf(stderr, "ERROR: Unable to close file '%s'\n", path);
+
+	if(fclose(f)) return ERR_F2B_FAILED_CLOSE;
+	return ret;
 }
 
 /* Check if shader was compiled successfully */
@@ -95,7 +114,9 @@ void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
 /* Generate shader from file path - general function */
 unsigned int f_gl_genshader(const char* path, int type, char* chbuf, unsigned int chbufsz) {
 	int len = 0;
-	f_io_filetobuf(path, &len, chbuf, chbufsz);
+	if(f_io_filetobuf(path, &len, chbuf, chbufsz)) {
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
+	}
 
 	unsigned int s = glCreateShader(type);
 	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
@@ -281,11 +302,9 @@ void f_render_loop(void* win, int transformloc) {
 }
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
-	static char chbuf[CHBUFSZ_] = {0};
-
-	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, chbuf, CHBUFSZ_);
-	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, chbuf, CHBUFSZ_);
-	unsigned int sp = f_gl_genprogram(vert, frag, chbuf, CHBUFSZ_);
+	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, g_chbuf, CHBUFSZ_);
+	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, g_chbuf, CHBUFSZ_);
+	unsigned int sp = f_gl_genprogram(vert, frag, g_chbuf, CHBUFSZ_);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
