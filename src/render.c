@@ -30,7 +30,7 @@
  * "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
  */
 
-#define M_LEN(x) (sizeof(x) / sizeof(*x))
+#define M_LEN(x) (sizeof ((x)) / sizeof (*(x)))
 
 enum e_chbufsz_ { CHBUFSZ_ = 0x40000 };
 char g_chbuf[CHBUFSZ_];
@@ -47,13 +47,10 @@ enum e_filetobuf_errors {
 	ERR_F2B_FAILED_CLOSE,
 };
 
-/* Read file into buffer */
-/* No longer causes program exit on failure */
-/* Sets length to 0 on any failure, always null terminated */
+/* Read file into buffer as null-terminated string */
+/* Returns 0 on success, nonzero on failure */
 int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
-	if(buflen == 0) {
-		return ERR_F2B_ZERO_SIZE_BUFFER;
-	}
+	if(!buflen) return ERR_F2B_ZERO_SIZE_BUFFER;
 
 	/* Open file */
 	FILE* f = fopen(path, "rb");
@@ -77,16 +74,16 @@ int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
 		ret = ERR_F2B_BUFFER_TOO_SMALL;
 	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
 		ret = ERR_F2B_FAILED_READ;
-	else goto end;
+	else {
+		/* Add null terminator */
+		buf[l] = 0;
+		goto end;
+	}
 
-	/* If any of the above fails return empty string */
-	l = 0;
+	buf[0] = 0;
 
-	/* Always return null-terminated string */
 	end:
-	buf[l] = 0;
 	if(len) *len = l;
-
 	if(fclose(f)) return ERR_F2B_FAILED_CLOSE;
 	return ret;
 }
