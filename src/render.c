@@ -88,59 +88,68 @@ int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
 	return ret;
 }
 
+enum e_gl_shader_check {
+	ERR_GL_SHADER_SUCCESS = 0,
+	ERR_GL_SHADER_FAIL,
+	ERR_GL_SHADER_FAIL_LOG_INCOMPLETE,
+};
+
 /* Check if shader was compiled successfully */
-void f_gl_chkcmp(unsigned int s, char* infolog, int il_len) {
-	int success = 0;
-	glGetShaderiv(s, GL_COMPILE_STATUS, &success);
-	if(success) return;
+int f_gl_chkcmp(unsigned int s, int *log_len, char* infolog, int il_len) {
+	int ret = 0;
+	glGetShaderiv(s, GL_COMPILE_STATUS, &ret);
+	if(ret) return ERR_GL_SHADER_SUCCESS;
+
+	ret = ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
+	if(log_len) *log_len = gl_il_len;
+
 	if(gl_il_len > il_len)
-		fprintf(stderr,
-			"ERROR: Unable to get complete shader info log - log too large!\n"
-			"(size = %d, max size = %d)\n",
-			gl_il_len, il_len
-		);
+		ret = ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
 
 	glGetShaderInfoLog(s, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
-	fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", infolog);
+
+	return ret;
 }
 
 /* Generate shader from file path - general function */
 unsigned int f_gl_genshader(const char* path, int type, char* chbuf, unsigned int chbufsz) {
 	int len = 0;
-	if(f_io_filetobuf(path, &len, chbuf, chbufsz)) {
+	if(f_io_filetobuf(path, &len, chbuf, chbufsz))
 		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
-	}
 
 	unsigned int s = glCreateShader(type);
 	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
 	glCompileShader(s);
 
-	f_gl_chkcmp(s, chbuf, chbufsz);
+	if(f_gl_chkcmp(s, NULL, chbuf, chbufsz))
+		fprintf(stderr, "ERROR: Failed to compile!\n[log]\n%s\n", chbuf);
+
 	return s;
 }
 
 /* Check if program was linked successfully */
-void f_gl_chklink(unsigned int sp, char* infolog, int il_len) {
-	int success = 0;
-	glGetProgramiv(sp, GL_LINK_STATUS, &success);
-	if(success) return;
+int f_gl_chklink(unsigned int sp, int *log_len, char* infolog, int il_len) {
+	int ret = 0;
+	glGetProgramiv(sp, GL_LINK_STATUS, &ret);
+	if(ret) return ERR_GL_SHADER_SUCCESS;
+
+	ret = ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
+	if(log_len) *log_len = gl_il_len;
+
 	if(gl_il_len > il_len)
-		fprintf(stderr,
-			"ERROR: Unable to get complete shader program info log - log too large!\n"
-			"(size = %d, max size = %d)\n",
-			gl_il_len, il_len
-		);
+		ret = ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
 
 	glGetProgramInfoLog(sp, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
-	fprintf(stderr, "ERROR: Unable to link shader program! Error log:\n%s\n", infolog);
+
+	return ret;
 }
 
 /* Generate shader program from given vertex and fragment shaders */
@@ -152,7 +161,9 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, 
 
 	glLinkProgram(sp);
 
-	f_gl_chklink(sp, chbuf, chbufsz);
+	if(f_gl_chklink(sp, NULL, chbuf, chbufsz))
+		fprintf(stderr, "ERROR: Failed to link!\n[log]\n%s\n", chbuf);
+
 	return sp;
 }
 

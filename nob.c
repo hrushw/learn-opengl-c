@@ -15,9 +15,9 @@
 
 void _check_assert(int assertion, char* name) {
 	if(assertion)
-		printf("[Assertion] %s : passed, continuing...\n", name);
+		printf("[ASSERT] %s : passed, continuing...\n", name);
 	else
-		printf("[Assertion] %s : FAILED! Exiting...\n", name), exit(-1);
+		printf("[ASSERT] %s : FAILED! Exiting...\n", name), exit(-1);
 }
 
 #define chk_assert(x) _check_assert(x, #x)
@@ -30,12 +30,10 @@ int main(int argc, char* argv[]) {
 	if(argc > 1) {
 		if(!strcmp(argv[1], "clean")) {
 			nob_cmd_append(&cmd, "rm", "-f", "render", M_OBJS);
-			if(nob_cmd_run_sync(cmd)) return -1;
-			return 0;
+			return nob_cmd_run_sync(cmd) ? 0 : -1;
 		} else if(!strcmp(argv[1], "run")) {
 			nob_cmd_append(&cmd, "./render");
-			if(nob_cmd_run_sync(cmd)) return -1;
-			return 0;
+			return nob_cmd_run_sync(cmd) ? 0 : -1;
 		} else {
 			nob_log(NOB_ERROR, "Invalid option '%s'", argv[1]);
 			return -1;
