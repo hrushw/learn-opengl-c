@@ -32,9 +32,6 @@
 
 #define M_LEN(x) (sizeof ((x)) / sizeof (*(x)))
 
-enum e_chbufsz_ { CHBUFSZ_ = 0x40000 };
-char g_chbuf[CHBUFSZ_];
-
 enum e_filetobuf_errors {
 	ERR_F2B_SUCCESS = 0,
 
@@ -116,17 +113,21 @@ int f_gl_chkcmp(unsigned int s, int *log_len, char* infolog, int il_len) {
 }
 
 /* Generate shader from file path - general function */
-unsigned int f_gl_genshader(const char* path, int type, char* chbuf, unsigned int chbufsz) {
+unsigned int f_gl_genshader (
+	const char* path, int type,
+	char* srcbuf, unsigned int srcbufsz,
+	char* logbuf, unsigned int logbufsz
+) {
 	int len = 0;
-	if(f_io_filetobuf(path, &len, chbuf, chbufsz))
+	if(f_io_filetobuf(path, &len, srcbuf, srcbufsz))
 		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
 
 	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, (const char* const*)(&chbuf), NULL);
+	glShaderSource(s, 1, (const char* const*)(&srcbuf), NULL);
 	glCompileShader(s);
 
-	if(f_gl_chkcmp(s, NULL, chbuf, chbufsz))
-		fprintf(stderr, "ERROR: Failed to compile!\n[log]\n%s\n", chbuf);
+	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
+		fprintf(stderr, "ERROR: Failed to compile!\n[log]\n%s\n", logbuf);
 
 	return s;
 }
@@ -310,9 +311,27 @@ void f_render_loop(void* win, int transformloc) {
 }
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
-	unsigned int vert = f_gl_genshader(vertpath, GL_VERTEX_SHADER, g_chbuf, CHBUFSZ_);
-	unsigned int frag = f_gl_genshader(fragpath, GL_FRAGMENT_SHADER, g_chbuf, CHBUFSZ_);
-	unsigned int sp = f_gl_genprogram(vert, frag, g_chbuf, CHBUFSZ_);
+	enum e_bufsz { BUFSZ_SHADER = 0x2000, BUFSZ_LOG = 0x1000 };
+
+	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
+	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};
+
+	static char vert_logbuf[ BUFSZ_LOG ] = {0};
+	static char frag_logbuf[ BUFSZ_LOG ] = {0};
+
+	static char shader_logbuf[ BUFSZ_LOG ] = {0};
+
+	unsigned int vert = f_gl_genshader (
+		vertpath, GL_VERTEX_SHADER,
+		vert_srcbuf, BUFSZ_SHADER,
+		vert_logbuf, BUFSZ_LOG
+	);
+	unsigned int frag = f_gl_genshader (
+		fragpath, GL_FRAGMENT_SHADER,
+		frag_srcbuf, BUFSZ_SHADER,
+		frag_logbuf, BUFSZ_LOG
+	);
+	unsigned int sp = f_gl_genprogram(vert, frag, shader_logbuf, BUFSZ_LOG);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
