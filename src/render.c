@@ -112,26 +112,6 @@ int f_gl_chkcmp(unsigned int s, int *log_len, char* infolog, int il_len) {
 	return ret;
 }
 
-/* Generate shader from file path - general function */
-unsigned int f_gl_genshader (
-	const char* path, int type,
-	char* srcbuf, unsigned int srcbufsz,
-	char* logbuf, unsigned int logbufsz
-) {
-	int len = 0;
-	if(f_io_filetobuf(path, &len, srcbuf, srcbufsz))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
-
-	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, (const char* const*)(&srcbuf), NULL);
-	glCompileShader(s);
-
-	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
-		fprintf(stderr, "ERROR: Failed to compile!\n[log]\n%s\n", logbuf);
-
-	return s;
-}
-
 /* Check if program was linked successfully */
 int f_gl_chklink(unsigned int sp, int *log_len, char* infolog, int il_len) {
 	int ret = 0;
@@ -151,6 +131,26 @@ int f_gl_chklink(unsigned int sp, int *log_len, char* infolog, int il_len) {
 	infolog[il_len-1] = 0;
 
 	return ret;
+}
+
+
+/* Generate shader from file path - general function */
+unsigned int f_gl_genshader (
+	const char* path, int type,
+	char* srcbuf, unsigned int srcbufsz,
+	char* logbuf, unsigned int logbufsz
+) {
+	if(f_io_filetobuf(path, NULL, srcbuf, srcbufsz))
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
+
+	unsigned int s = glCreateShader(type);
+	glShaderSource(s, 1, (const char* const*)(&srcbuf), NULL);
+	glCompileShader(s);
+
+	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
+		fprintf(stderr, "ERROR: Failed to compile!\n[log]\n%s\n", logbuf);
+
+	return s;
 }
 
 /* Generate shader program from given vertex and fragment shaders */
@@ -311,7 +311,8 @@ void f_render_loop(void* win, int transformloc) {
 }
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
-	enum e_bufsz { BUFSZ_SHADER = 0x2000, BUFSZ_LOG = 0x1000 };
+	enum e_bufsz_shader { BUFSZ_SHADER = 0x2000 };
+	enum e_bufsz_log {BUFSZ_LOG = 0x1000 };
 
 	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
 	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};
