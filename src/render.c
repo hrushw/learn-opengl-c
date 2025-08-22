@@ -149,7 +149,7 @@ unsigned int f_gl_genshader (
 	glCompileShader(s);
 
 	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
-		fprintf(stderr, "ERROR: Failed to compile shadere! Error log:\n%s\n", logbuf);
+		fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", logbuf);
 
 	return s;
 }
