@@ -4,6 +4,8 @@
 #include <limits.h>
 #include <string.h>
 
+#include "include/memarena.h"
+
 #define _LEN(x) (sizeof ((x))/ sizeof (*(x)))
 #define _STRARR(...) (const char* []) {__VA_ARGS__}
 #define CHECK_REBUILD(output, ...) nob_needs_rebuild(output, _STRARR(__VA_ARGS__), _LEN( (_STRARR(__VA_ARGS__)) ) )
@@ -17,7 +19,7 @@
 	#define M_CC "gcc", "-Wall", "-Wextra", "-Wpedantic", "-Wswitch", "-Wvla"
 #endif
 
-#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/main.o"
+#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/memarena.o", "obj/main.o"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
@@ -65,6 +67,8 @@ int main(int argc, char* argv[]) {
 	 * to compile this on some esoteric hardware */
 	chk_assert(CHAR_BIT == 8);
 
+	printf("sizeof t_arena_cell == %d\n", sizeof(t_arena_cell));
+
 	putchar('\n');
 
 	/* Check for updates and recompile object files */
@@ -88,6 +92,12 @@ int main(int argc, char* argv[]) {
 
 	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", "include/window.h", "include/vector.h")) {
+		if(!nob_cmd_run_sync(cmd)) return -1;
+	}
+	cmd.count = 0;
+
+	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/memarena.c", "-o", "obj/memarena.o");
+	if(CHECK_REBUILD_WITH_NOB("obj/memarena.o", "src/memarena.c", "include/memarena.h")) {
 		if(!nob_cmd_run_sync(cmd)) return -1;
 	}
 	cmd.count = 0;
