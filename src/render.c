@@ -8,6 +8,8 @@
 #include "window.h"
 #include "vector.h"
 
+#include "shader.h"
+
 /* References
  * ----------
 
@@ -84,71 +86,6 @@ int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
 	if(fclose(f)) return ERR_F2B_FAILED_CLOSE;
 	return ret;
 }
-
-enum e_gl_shader_check {
-	ERR_GL_SHADER_SUCCESS = 0,
-	ERR_GL_SHADER_FAIL,
-	ERR_GL_SHADER_FAIL_LOG_INCOMPLETE,
-};
-
-int f_gl_genshader(
-	unsigned int *sid, int type, const char* srcbuf,
-	char* logbuf, unsigned int logbufsz, unsigned int* log_len
-) {
-	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, &srcbuf, NULL);
-	glCompileShader(s);
-
-	*sid = s;
-
-	int ret = 0;
-	glGetShaderiv(s, GL_COMPILE_STATUS, &ret);
-	if(ret) return ERR_GL_SHADER_SUCCESS;
-
-	if(!logbuf) return ERR_GL_SHADER_FAIL;
-
-	int gl_il_len;
-	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
-	if(log_len) *log_len = gl_il_len;
-
-	glGetShaderInfoLog(s, logbufsz, NULL, logbuf);
-	logbuf[logbufsz-1] = 0;
-
-	return (unsigned int) gl_il_len > logbufsz ?
-		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
-		ERR_GL_SHADER_FAIL ;
-}
-
-/* Generate shader program from given vertex and fragment shaders */
-int f_gl_genprogram(
-	unsigned int *spid, unsigned int vert, unsigned int frag,
-	char* logbuf, unsigned int logbufsz, unsigned int* log_len
-) {
-	unsigned int sp = glCreateProgram();
-	glAttachShader(sp, vert);
-	glAttachShader(sp, frag);
-	glLinkProgram(sp);
-
-	*spid = sp;
-
-	int ret = 0;
-	glGetProgramiv(sp, GL_LINK_STATUS, &ret);
-	if(ret) return ERR_GL_SHADER_SUCCESS;
-
-	if(!logbuf) return ERR_GL_SHADER_FAIL;
-
-	int gl_il_len;
-	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
-	if(log_len) *log_len = gl_il_len;
-
-	glGetProgramInfoLog(sp, logbufsz, NULL, logbuf);
-	logbuf[logbufsz-1] = 0;
-
-	return (unsigned int) gl_il_len > logbufsz ?
-		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
-		ERR_GL_SHADER_FAIL ;
-}
-
 
 /* Evaluate keyboard and mouse events */
 /* Currently handles shortcuts for resetting time and exit */

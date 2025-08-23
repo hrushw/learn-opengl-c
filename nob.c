@@ -19,7 +19,8 @@
 	#define M_CC "gcc", "-Wall", "-Wextra", "-Wpedantic", "-Wswitch", "-Wvla"
 #endif
 
-#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/memarena.o", "obj/main.o"
+#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/shader.o", "obj/main.o"
+#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
@@ -93,8 +94,14 @@ int main(int argc, char* argv[]) {
 	}
 	cmd.count = 0;
 
+	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o");
+	if(CHECK_REBUILD_WITH_NOB("obj/shader.o", "src/shader.c", "include/shader.h")) {
+		if(!nob_cmd_run_sync(cmd)) return -1;
+	}
+	cmd.count = 0;
+
 	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
-	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", "include/window.h", "include/vector.h", "include/memarena.h")) {
+	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", M_HEADERS)) {
 		if(!nob_cmd_run_sync(cmd)) return -1;
 	}
 	cmd.count = 0;
