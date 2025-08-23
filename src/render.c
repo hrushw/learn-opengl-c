@@ -134,18 +134,12 @@ int f_gl_chklink(unsigned int sp, unsigned int *log_len, char* infolog, int il_l
 	return ret;
 }
 
-
-/* Generate shader from file path - general function */
 unsigned int f_gl_genshader (
-	const char* path, int type,
-	char* srcbuf, unsigned int srcbufsz,
+	int type, char* src,
 	char* logbuf, unsigned int logbufsz
 ) {
-	if(f_io_filetobuf(path, NULL, srcbuf, srcbufsz))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", path);
-
 	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, (const char* const*)(&srcbuf), NULL);
+	glShaderSource(s, 1, (const char* const*)(&src), NULL);
 	glCompileShader(s);
 
 	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
@@ -328,17 +322,20 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
 	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};
 
+	if(
+		f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER) ||
+		f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER)
+	) fprintf(stderr, "ERROR: Unable to get shader file contents!\n");
+
 	static char vert_logbuf[ BUFSZ_LOG ] = {0};
 	static char frag_logbuf[ BUFSZ_LOG ] = {0};
 
 	unsigned int vert = f_gl_genshader (
-		vertpath, GL_VERTEX_SHADER,
-		vert_srcbuf, BUFSZ_SHADER,
+		GL_VERTEX_SHADER, vert_srcbuf,
 		vert_logbuf, BUFSZ_LOG
 	);
 	unsigned int frag = f_gl_genshader (
-		fragpath, GL_FRAGMENT_SHADER,
-		frag_srcbuf, BUFSZ_SHADER,
+		GL_FRAGMENT_SHADER, frag_srcbuf,
 		frag_logbuf, BUFSZ_LOG
 	);
 	unsigned int sp = f_gl_genprogram(vert, frag, ar);
