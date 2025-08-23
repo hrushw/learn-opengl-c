@@ -7,7 +7,6 @@
 
 #include "window.h"
 #include "vector.h"
-#include "memarena.h"
 
 /* References
  * ----------
@@ -134,12 +133,9 @@ int f_gl_chklink(unsigned int sp, unsigned int *log_len, char* infolog, int il_l
 	return ret;
 }
 
-unsigned int f_gl_genshader (
-	int type, char* src,
-	char* logbuf, unsigned int logbufsz
-) {
+unsigned int f_gl_genshader(int type, const char* srcbuf, char* logbuf, unsigned int logbufsz) {
 	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, (const char* const*)(&src), NULL);
+	glShaderSource(s, 1, &srcbuf, NULL);
 	glCompileShader(s);
 
 	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
@@ -149,7 +145,7 @@ unsigned int f_gl_genshader (
 }
 
 /* Generate shader program from given vertex and fragment shaders */
-unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, struct t_mem_arena *ar) {
+unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, unsigned int chbufsz) {
 	unsigned int sp = glCreateProgram();
 
 	glAttachShader(sp, vert);
@@ -157,14 +153,8 @@ unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, struct t_mem_
 
 	glLinkProgram(sp);
 
-	unsigned int loglen = 0;
-	unsigned int arsz = ar->size * sizeof(t_arena_cell);
-
-	if(f_gl_chklink(sp, &loglen, (char*) ar->mem, arsz))
-		fprintf(stderr, "ERROR: Failed to link program! Error log:\n%s\n", (char*)ar->mem);
-	f_arena_push(ar, loglen > arsz ? arsz : loglen);
-
-	// printf("Arena index: %d\n", ar->cur);
+	if(f_gl_chklink(sp, NULL, chbuf, chbufsz))
+		fprintf(stderr, "ERROR: Failed to link program! Error log:\n%s\n", chbuf);
 
 	return sp;
 }
@@ -315,20 +305,19 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_shader { BUFSZ_SHADER = 0x2000 };
 	enum e_bufsz_log {BUFSZ_LOG = 0x1000 };
 
-	static t_arena_cell arbuf[ 0x10000 / sizeof(t_arena_cell) ] = {0};
-	struct t_mem_arena *ar = (struct t_mem_arena *) arbuf;
-	ar->size = M_LEN(arbuf), ar->cur = 0;
-
 	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
 	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};
 
-	if(
-		f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER) ||
-		f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER)
-	) fprintf(stderr, "ERROR: Unable to get shader file contents!\n");
+	if(f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER))
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", vertpath);
+
+	if(f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER))
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", fragpath);
 
 	static char vert_logbuf[ BUFSZ_LOG ] = {0};
 	static char frag_logbuf[ BUFSZ_LOG ] = {0};
+
+	static char prog_logbuf[ BUFSZ_LOG ] = {0};
 
 	unsigned int vert = f_gl_genshader (
 		GL_VERTEX_SHADER, vert_srcbuf,
@@ -338,7 +327,7 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 		GL_FRAGMENT_SHADER, frag_srcbuf,
 		frag_logbuf, BUFSZ_LOG
 	);
-	unsigned int sp = f_gl_genprogram(vert, frag, ar);
+	unsigned int sp = f_gl_genprogram(vert, frag, prog_logbuf, BUFSZ_LOG);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
