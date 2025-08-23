@@ -1,4 +1,5 @@
 #define NOB_IMPLEMENTATION
+#define NOB_WARN_DEPRECATED
 #include "nob.h"
 
 #include <limits.h>
@@ -61,10 +62,10 @@ int main(int argc, char* argv[]) {
 	if(argc > 1) {
 		if(!strcmp(argv[1], "clean")) {
 			nob_cmd_append(&cmd, "rm", "-f", "render", M_OBJS);
-			return nob_cmd_run_sync(cmd) ? 0 : -1;
+			return nob_cmd_run(&cmd) ? 0 : -1;
 		} else if(!strcmp(argv[1], "run")) {
 			nob_cmd_append(&cmd, "./render");
-			return nob_cmd_run_sync(cmd) ? 0 : -1;
+			return nob_cmd_run(&cmd) ? 0 : -1;
 		} else {
 			nob_log(NOB_ERROR, "Invalid option '%s'", argv[1]);
 			return -1;
@@ -76,50 +77,42 @@ int main(int argc, char* argv[]) {
 	putchar('\n');
 
 	/* Check for updates and recompile object files */
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/main.c", "-o", "obj/main.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/main.o", "src/main.c", "include/window.h")) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/main.c", "-o", "obj/main.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/window.c", "-o", "obj/window.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/window.o", "src/window.c", "include/window.h")) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/window.c", "-o", "obj/window.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/vector.c", "-o", "obj/vector.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/vector.o", "src/vector.c", "include/vector.h")) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/vector.c", "-o", "obj/vector.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/shader.o", "src/shader.c", "include/shader.h")) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", M_HEADERS)) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
-	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/memarena.c", "-o", "obj/memarena.o");
 	if(CHECK_REBUILD_WITH_NOB("obj/memarena.o", "src/memarena.c", "include/memarena.h")) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/memarena.c", "-o", "obj/memarena.o");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
 	/* Recompile final executable from objects */
-	nob_cmd_append(&cmd, M_CC, M_LFLAGS, M_OBJS, "-o", "render");
 	if(CHECK_REBUILD_WITH_NOB("render", M_OBJS)) {
-		if(!nob_cmd_run_sync(cmd)) return -1;
+		nob_cmd_append(&cmd, M_CC, M_LFLAGS, M_OBJS, "-o", "render");
+		if(!nob_cmd_run(&cmd)) return -1;
 	}
-	cmd.count = 0;
 
 	nob_cmd_free(cmd);
 	return 0;
 }
-
