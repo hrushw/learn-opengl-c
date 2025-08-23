@@ -91,70 +91,62 @@ enum e_gl_shader_check {
 	ERR_GL_SHADER_FAIL_LOG_INCOMPLETE,
 };
 
-/* Check if shader was compiled successfully */
-int f_gl_chkcmp(unsigned int s, unsigned int *log_len, char* infolog, int il_len) {
+int f_gl_genshader(
+	unsigned int *sid, int type, const char* srcbuf,
+	char* logbuf, unsigned int logbufsz, unsigned int* log_len
+) {
+	unsigned int s = glCreateShader(type);
+	glShaderSource(s, 1, &srcbuf, NULL);
+	glCompileShader(s);
+
+	*sid = s;
+
 	int ret = 0;
 	glGetShaderiv(s, GL_COMPILE_STATUS, &ret);
 	if(ret) return ERR_GL_SHADER_SUCCESS;
 
-	if(!infolog) return ERR_GL_SHADER_FAIL;
+	if(!logbuf) return ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
 
-	glGetShaderInfoLog(s, il_len, NULL, infolog);
-	infolog[il_len-1] = 0;
+	glGetShaderInfoLog(s, logbufsz, NULL, logbuf);
+	logbuf[logbufsz-1] = 0;
 
-	return gl_il_len > il_len ?
+	return (unsigned int) gl_il_len > logbufsz ?
 		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
 		ERR_GL_SHADER_FAIL ;
 }
 
-/* Check if program was linked successfully */
-int f_gl_chklink(unsigned int sp, unsigned int *log_len, char* infolog, int il_len) {
+/* Generate shader program from given vertex and fragment shaders */
+int f_gl_genprogram(
+	unsigned int *spid, unsigned int vert, unsigned int frag,
+	char* logbuf, unsigned int logbufsz, unsigned int* log_len
+) {
+	unsigned int sp = glCreateProgram();
+	glAttachShader(sp, vert);
+	glAttachShader(sp, frag);
+	glLinkProgram(sp);
+
+	*spid = sp;
+
 	int ret = 0;
 	glGetProgramiv(sp, GL_LINK_STATUS, &ret);
 	if(ret) return ERR_GL_SHADER_SUCCESS;
 
-	if(!infolog) return ERR_GL_SHADER_FAIL;
+	if(!logbuf) return ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
 
-	glGetProgramInfoLog(sp, il_len, NULL, infolog);
-	infolog[il_len-1] = 0;
+	glGetProgramInfoLog(sp, logbufsz, NULL, logbuf);
+	logbuf[logbufsz-1] = 0;
 
-	return gl_il_len > il_len ?
+	return (unsigned int) gl_il_len > logbufsz ?
 		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
 		ERR_GL_SHADER_FAIL ;
-}
-
-int f_gl_genshader(
-	unsigned int *s, int type, const char* srcbuf,
-	char* logbuf, unsigned int logbufsz, unsigned int* log_len
-) {
-	*s = glCreateShader(type);
-	glShaderSource(*s, 1, &srcbuf, NULL);
-	glCompileShader(*s);
-
-	return f_gl_chkcmp(*s, log_len, logbuf, logbufsz);
-}
-
-/* Generate shader program from given vertex and fragment shaders */
-int f_gl_genprogram(
-	unsigned int *sp, unsigned int vert, unsigned int frag,
-	char* logbuf, unsigned int logbufsz, unsigned int* log_len
-) {
-	*sp = glCreateProgram();
-
-	glAttachShader(*sp, vert);
-	glAttachShader(*sp, frag);
-
-	glLinkProgram(*sp);
-
-	return f_gl_chklink(*sp, log_len, logbuf, logbufsz);
 }
 
 
@@ -301,7 +293,7 @@ void f_render_loop(void* win, int transformloc) {
 
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_shader { BUFSZ_SHADER = 0x2000 };
-	enum e_bufsz_log {BUFSZ_LOG = 0x1000 };
+	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
 
 	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
 	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};
