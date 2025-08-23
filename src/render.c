@@ -97,19 +97,18 @@ int f_gl_chkcmp(unsigned int s, unsigned int *log_len, char* infolog, int il_len
 	glGetShaderiv(s, GL_COMPILE_STATUS, &ret);
 	if(ret) return ERR_GL_SHADER_SUCCESS;
 
-	ret = ERR_GL_SHADER_FAIL;
+	if(!infolog) return ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
 
-	if(gl_il_len > il_len)
-		ret = ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
-
 	glGetShaderInfoLog(s, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
 
-	return ret;
+	return gl_il_len > il_len ?
+		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
+		ERR_GL_SHADER_FAIL ;
 }
 
 /* Check if program was linked successfully */
@@ -118,45 +117,44 @@ int f_gl_chklink(unsigned int sp, unsigned int *log_len, char* infolog, int il_l
 	glGetProgramiv(sp, GL_LINK_STATUS, &ret);
 	if(ret) return ERR_GL_SHADER_SUCCESS;
 
-	ret = ERR_GL_SHADER_FAIL;
+	if(!infolog) return ERR_GL_SHADER_FAIL;
 
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
 
-	if(gl_il_len > il_len)
-		ret = ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
-
 	glGetProgramInfoLog(sp, il_len, NULL, infolog);
 	infolog[il_len-1] = 0;
 
-	return ret;
+	return gl_il_len > il_len ?
+		ERR_GL_SHADER_FAIL_LOG_INCOMPLETE :
+		ERR_GL_SHADER_FAIL ;
 }
 
-unsigned int f_gl_genshader(int type, const char* srcbuf, char* logbuf, unsigned int logbufsz) {
-	unsigned int s = glCreateShader(type);
-	glShaderSource(s, 1, &srcbuf, NULL);
-	glCompileShader(s);
+int f_gl_genshader(
+	unsigned int *s, int type, const char* srcbuf,
+	char* logbuf, unsigned int logbufsz, unsigned int* log_len
+) {
+	*s = glCreateShader(type);
+	glShaderSource(*s, 1, &srcbuf, NULL);
+	glCompileShader(*s);
 
-	if(f_gl_chkcmp(s, NULL, logbuf, logbufsz))
-		fprintf(stderr, "ERROR: Failed to compile shader! Error log:\n%s\n", logbuf);
-
-	return s;
+	return f_gl_chkcmp(*s, log_len, logbuf, logbufsz);
 }
 
 /* Generate shader program from given vertex and fragment shaders */
-unsigned int f_gl_genprogram(unsigned int vert, unsigned int frag, char* chbuf, unsigned int chbufsz) {
-	unsigned int sp = glCreateProgram();
+int f_gl_genprogram(
+	unsigned int *sp, unsigned int vert, unsigned int frag,
+	char* logbuf, unsigned int logbufsz, unsigned int* log_len
+) {
+	*sp = glCreateProgram();
 
-	glAttachShader(sp, vert);
-	glAttachShader(sp, frag);
+	glAttachShader(*sp, vert);
+	glAttachShader(*sp, frag);
 
-	glLinkProgram(sp);
+	glLinkProgram(*sp);
 
-	if(f_gl_chklink(sp, NULL, chbuf, chbufsz))
-		fprintf(stderr, "ERROR: Failed to link program! Error log:\n%s\n", chbuf);
-
-	return sp;
+	return f_gl_chklink(*sp, log_len, logbuf, logbufsz);
 }
 
 
@@ -319,15 +317,20 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 
 	static char prog_logbuf[ BUFSZ_LOG ] = {0};
 
-	unsigned int vert = f_gl_genshader (
-		GL_VERTEX_SHADER, vert_srcbuf,
-		vert_logbuf, BUFSZ_LOG
-	);
-	unsigned int frag = f_gl_genshader (
-		GL_FRAGMENT_SHADER, frag_srcbuf,
-		frag_logbuf, BUFSZ_LOG
-	);
-	unsigned int sp = f_gl_genprogram(vert, frag, prog_logbuf, BUFSZ_LOG);
+	unsigned int vert, frag, sp;
+
+	if(f_gl_genshader (
+		&vert, GL_VERTEX_SHADER, vert_srcbuf,
+		vert_logbuf, BUFSZ_LOG, NULL
+	)) fprintf(stderr, "ERROR: Failed to compile vertex shader! Error log:\n%s\n", vert_logbuf);
+
+	if(f_gl_genshader (
+		&frag, GL_FRAGMENT_SHADER, frag_srcbuf,
+		frag_logbuf, BUFSZ_LOG, NULL
+	)) fprintf(stderr, "ERROR: Failed to compile fragment shader! Error log:\n%s\n", frag_logbuf);
+
+	if(f_gl_genprogram(&sp, vert, frag, prog_logbuf, BUFSZ_LOG, NULL))
+		fprintf(stderr, "ERROR: Failed to link shader program! Error log:\n%s\n", prog_logbuf);
 
 	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);

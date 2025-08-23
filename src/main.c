@@ -31,7 +31,7 @@ int main(void) {
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 
-	void* win = f_glfw_initwin("Tetrahedron", 640, 480, WIN_DEF, &ws);
+	void* win = f_glfw_initwin("Tetrahedron", 640, 480, WIN_MAX, &ws);
 	if(!win) {
 		status = -2;
 		goto end;
