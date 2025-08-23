@@ -323,9 +323,7 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 
 	static t_arena_cell arbuf[ 0x10000 / sizeof(t_arena_cell) ] = {0};
 	struct t_mem_arena *ar = (struct t_mem_arena *) arbuf;
-	ar->size = M_LEN(arbuf);
-	ar->cur = 0;
-	// struct t_mem_arena ar = { M_LEN(arbuf), 0, arbuf };
+	ar->size = M_LEN(arbuf), ar->cur = 0;
 
 	static char vert_srcbuf[ BUFSZ_SHADER ] = {0};
 	static char frag_srcbuf[ BUFSZ_SHADER ] = {0};

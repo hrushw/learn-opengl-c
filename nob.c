@@ -32,8 +32,28 @@ void _check_assert(int assertion, char* name) {
 
 #define chk_assert(x) _check_assert(x, #x)
 
+void c_checks(void) {
+	/* I will probably not compile outside of x86_64 for a long time but *
+	 * these cheks may save some nerd centuries in the future attempting *
+	 * to compile this on some esoteric hardware */
+
+	/* I frequently use integers as array indices, and checking  *
+	 * for all such cases and replacing with size_t just in case *
+	 * of 16 bit integers is too much of a pain */
+	chk_assert(sizeof(int) >= 4);
+
+	/* OpenGL requires 32 bit floats */
+	chk_assert(sizeof(float) == 4);
+
+	chk_assert(CHAR_BIT == 8);
+
+	printf("sizeof t_arena_cell == %d\n", sizeof(t_arena_cell));
+
+	chk_assert(sizeof(struct t_mem_arena) % sizeof(t_arena_cell) == 0);
+}
+
 int main(int argc, char* argv[]) {
-	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h");
+	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h", "include/memarena.h");
 
 	Nob_Cmd cmd = {0};
 
@@ -51,24 +71,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	putchar('\n');
-
-	/* Bit width checks for OpenGL */
-
-	/* I frequently use integers as array indices, and checking  *
-	 * for all such cases and replacing with size_t just in case *
-	 * of 16 bit integers is too much of a pain*/
-	chk_assert(sizeof(int) >= 4);
-
-	/* OpenGL requires 32 bit floats */
-	chk_assert(sizeof(float) == 4);
-
-	/* I will probably not compile outside of x86_64 for a long time but *
-	 * these cheks may save some nerd centuries in the future attempting *
-	 * to compile this on some esoteric hardware */
-	chk_assert(CHAR_BIT == 8);
-
-	printf("sizeof t_arena_cell == %d\n", sizeof(t_arena_cell));
-
+	c_checks();
 	putchar('\n');
 
 	/* Check for updates and recompile object files */
@@ -91,7 +94,7 @@ int main(int argc, char* argv[]) {
 	cmd.count = 0;
 
 	nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
-	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", "include/window.h", "include/vector.h")) {
+	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", "include/window.h", "include/vector.h", "include/memarena.h")) {
 		if(!nob_cmd_run_sync(cmd)) return -1;
 	}
 	cmd.count = 0;
