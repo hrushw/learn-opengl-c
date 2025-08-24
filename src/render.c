@@ -7,8 +7,8 @@
 
 #include "window.h"
 #include "vector.h"
-
 #include "shader.h"
+#include "fileio.h"
 
 /* References
  * ----------
@@ -33,59 +33,6 @@
  */
 
 #define M_LEN(x) (sizeof ((x)) / sizeof (*(x)))
-
-enum e_filetobuf_errors {
-	ERR_F2B_SUCCESS = 0,
-
-	ERR_F2B_ZERO_SIZE_BUFFER,
-	ERR_F2B_FAILED_OPEN,
-	ERR_F2B_FAILED_SEEK,
-	ERR_F2B_FAILED_GET_SIZE,
-	ERR_F2B_BUFFER_TOO_SMALL,
-	ERR_F2B_FAILED_READ,
-	ERR_F2B_FAILED_CLOSE,
-};
-
-/* Read file into buffer as null-terminated string */
-/* Returns 0 on success, nonzero on failure */
-int f_io_filetobuf(const char* path, int* len, char* buf, unsigned int buflen) {
-	if(!buflen) return ERR_F2B_ZERO_SIZE_BUFFER;
-
-	/* Open file */
-	FILE* f = fopen(path, "rb");
-	long l = 0;
-	int ret = ERR_F2B_SUCCESS;
-
-	/* Attempts in order: */
-	/* 1 . Check if file opened successfully */
-	/* 2 . Seek to end of file */
-	/* 3 . Get file size */
-	/* 4 . Check if buffer is large enough to store the file */
-	/* 5 . Seek to start of file and read contents into buffer */
-
-	if(!f)
-		return ERR_F2B_FAILED_OPEN;
-	else if( fseek(f, 0L, SEEK_END) == -1 )
-		ret = ERR_F2B_FAILED_SEEK;
-	else if( (l = ftell(f)) < 0 )
-		ret = ERR_F2B_FAILED_GET_SIZE;
-	else if( l > buflen - 1 )
-		ret = ERR_F2B_BUFFER_TOO_SMALL;
-	else if( rewind(f), fread(buf, sizeof(char), l, f) != (size_t)l )
-		ret = ERR_F2B_FAILED_READ;
-	else {
-		/* Add null terminator */
-		buf[l] = 0;
-		goto end;
-	}
-
-	buf[0] = 0;
-
-	end:
-	if(len) *len = l;
-	if(fclose(f)) return ERR_F2B_FAILED_CLOSE;
-	return ret;
-}
 
 /* Evaluate keyboard and mouse events */
 /* Currently handles shortcuts for resetting time and exit */
@@ -181,7 +128,7 @@ void f_render_init(void) {
 }
 
 void f_render_loop(void* win, int transformloc) {
-	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(win);
+	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
 
 	struct mat4x4f transforms[] = {
 		c_mat4x4f_identity,
@@ -228,6 +175,7 @@ void f_render_loop(void* win, int transformloc) {
 	}
 }
 
+/* TODO fix this monstrous function with too many static buffers and console outputs */
 unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_shader { BUFSZ_SHADER = 0x2000 };
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
@@ -246,7 +194,7 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 
 	static char prog_logbuf[ BUFSZ_LOG ] = {0};
 
-	unsigned int vert, frag, sp;
+	unsigned int vert = 0, frag = 0, sp = 0;
 
 	if(f_gl_genshader (
 		&vert, GL_VERTEX_SHADER, vert_srcbuf,
@@ -270,7 +218,7 @@ unsigned int f_render_genprogram(const char* vertpath, const char* fragpath) {
 	return sp;
 }
 
-/* Main function wrapped around glfw initalization and window creation */
+/* Initialize OpenGL objects, start render loop, destroy objects after quit */
 void f_render_main(void* win) {
 	/* Generate and bind objects */
 	unsigned int VAO;

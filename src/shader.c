@@ -2,7 +2,7 @@
 
 #include "shader.h"
 
-int f_gl_genshader(
+enum e_gl_shader_check f_gl_genshader(
 	unsigned int *sid, int type, const char* srcbuf,
 	char* logbuf, unsigned int logbufsz, unsigned int* log_len
 ) {
@@ -31,7 +31,7 @@ int f_gl_genshader(
 }
 
 /* Generate shader program from given vertex and fragment shaders */
-int f_gl_genprogram(
+enum e_gl_shader_check f_gl_genprogram(
 	unsigned int *spid, unsigned int vert, unsigned int frag,
 	char* logbuf, unsigned int logbufsz, unsigned int* log_len
 ) {

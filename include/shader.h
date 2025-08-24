@@ -7,12 +7,12 @@ enum e_gl_shader_check {
 	ERR_GL_SHADER_FAIL_LOG_INCOMPLETE,
 };
 
-int f_gl_genshader(
+enum e_gl_shader_check f_gl_genshader(
 	unsigned int *, int, const char*,
 	char*, unsigned int, unsigned int*
 );
 
-int f_gl_genprogram(
+enum e_gl_shader_check f_gl_genprogram(
 	unsigned int*, unsigned int, unsigned int,
 	char*, unsigned int, unsigned int*
 );
