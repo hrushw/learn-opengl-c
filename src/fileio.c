@@ -43,6 +43,7 @@ enum e_filetobuf_error f_io_filetobuf(
 
 	end:
 	/* not bothering to check long to int conversion */
+	/* length is set to size excluding null terminator */
 	if(len) *len = l;
 	if(fclose(f)) return ERR_F2B_FAILED_CLOSE;
 	return ret;
