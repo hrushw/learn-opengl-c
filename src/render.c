@@ -2,7 +2,6 @@
 #include <GLFW/glfw3.h>
 #include <epoxy/gl.h>
 
-#include <stdio.h>
 #include <math.h>
 
 #include "window.h"
@@ -64,9 +63,6 @@ void f_render_evalstate(struct t_glfw_winstate *wst) {
 			break;
 
 		case IEV_SCROLL:
-			// printf("SCROLLING: %.4lf %.4lf\n", qev->ev.scroll_ev.sx, qev->ev.scroll_ev.sy);
-			break;
-
 		case IEV_MOUSEBUTTON:
 			break;
 		}
@@ -177,52 +173,40 @@ void f_render_loop(void* win, int transformloc) {
 
 unsigned int f_render_genprogram(char* vertsrc, char* fragsrc) {
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
-	// enum e_bufsz_log { BUFSZ_LOG = 0x10 };
-	static char logbuf[ 3 * BUFSZ_LOG ] = {0};
-
-	char* vert_logbuf = logbuf;
-	char* frag_logbuf = logbuf + BUFSZ_LOG;
-	char* prog_logbuf = logbuf + 2*BUFSZ_LOG;
 
 	unsigned int vert = 0, frag = 0, sp = 0;
 
-	if(f_gl_genshader (
-		&vert, GL_VERTEX_SHADER, vertsrc,
-		vert_logbuf, BUFSZ_LOG, NULL
-	)) fprintf(stderr, "ERROR: Failed to compile vertex shader! Error log:\n%s\n", vert_logbuf);
+	if( f_gl_genshader( &vert, GL_VERTEX_SHADER, vertsrc, NULL, 0, NULL) ) goto fail_vert;
 
-	if(f_gl_genshader (
-		&frag, GL_FRAGMENT_SHADER, fragsrc,
-		frag_logbuf, BUFSZ_LOG, NULL
-	)) fprintf(stderr, "ERROR: Failed to compile fragment shader! Error log:\n%s\n", frag_logbuf);
+	if( f_gl_genshader( &frag, GL_FRAGMENT_SHADER, fragsrc, NULL, 0, NULL) ) goto fail_frag;
 
-	if(f_gl_genprogram(&sp, vert, frag, prog_logbuf, BUFSZ_LOG, NULL))
-		fprintf(stderr, "ERROR: Failed to link shader program! Error log:\n%s\n", prog_logbuf);
+	int ret = f_gl_genprogram(&sp, vert, frag, NULL, 0, NULL);
 
-	glDetachShader(sp, vert);
 	glDetachShader(sp, frag);
+	glDetachShader(sp, vert);
 
-	glDeleteShader(vert);
 	glDeleteShader(frag);
 
+fail_frag:
+	glDeleteShader(vert);
+
+	if(ret) glDeleteProgram(sp), sp = 0;
+
+fail_vert:
 	return sp;
 }
 
-/* TODO fix this monstrous function with too many static buffers and console outputs */
 unsigned int f_render_genprogram_file(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_shader { BUFSZ_SHADER = 0x2000 };
-	// enum e_bufsz_shader { BUFSZ_SHADER = 0x20 };
 
 	static char srcbuf[ 2 * BUFSZ_SHADER ] = {0};
 
 	char* vert_srcbuf = srcbuf;
 	char* frag_srcbuf = srcbuf + BUFSZ_SHADER;
 
-	if(f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", vertpath), vert_srcbuf[0] = 0;
+	if(f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER)) return 0;
 
-	if(f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", fragpath), frag_srcbuf[0] = 0;
+	if(f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER)) return 0;
 
 	return f_render_genprogram(srcbuf, srcbuf + BUFSZ_SHADER);
 }
@@ -250,8 +234,6 @@ void f_render_main(void* win) {
 	glUseProgram(sp);
 
 	int transformloc = glGetUniformLocation(sp, "transform");
-	if(transformloc < 0)
-		fprintf(stderr, "ERROR: Unable to get location for uniform 'transform'!\n");
 
 	f_render_init();
 	f_render_loop(win, transformloc);
