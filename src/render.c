@@ -219,10 +219,10 @@ unsigned int f_render_genprogram_file(const char* vertpath, const char* fragpath
 	char* frag_srcbuf = srcbuf + BUFSZ_SHADER;
 
 	if(f_io_filetobuf(vertpath, NULL, vert_srcbuf, BUFSZ_SHADER))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", vertpath);
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", vertpath), vert_srcbuf[0] = 0;
 
 	if(f_io_filetobuf(fragpath, NULL, frag_srcbuf, BUFSZ_SHADER))
-		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", fragpath);
+		fprintf(stderr, "ERROR: Unable to get contents for file '%s'!\n", fragpath), frag_srcbuf[0] = 0;
 
 	return f_render_genprogram(srcbuf, srcbuf + BUFSZ_SHADER);
 }
