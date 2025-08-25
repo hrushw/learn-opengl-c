@@ -12,13 +12,16 @@ void* f_glfw_initwin (
 	enum e_wintype, struct t_glfw_winstate *
 );
 
+enum e_iqsz_ { IQSZ_ = 256 };
+struct t_glfw_inputevent wsiq[IQSZ_];
+
 struct t_glfw_winstate ws = {
 	.width = 0, .height = 0,
 	.mx = 0, .my = 0,
 	.time = 0,
 	.iq = {
-		.start = 0, .end = 0,
-		.queue = {{0}}
+		.start = 0, .end = 0, .size = IQSZ_,
+		.queue = wsiq
 	},
 	.szrefresh = 1,
 	.runstate = 1,

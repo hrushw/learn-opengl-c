@@ -55,7 +55,7 @@ void f_render_evalstate_key(struct t_glfw_winstate *wst, struct t_glfw_inputeven
 }
 
 void f_render_evalstate(struct t_glfw_winstate *wst) {
-	for(unsigned int i = wst->iq.start; (i %= IQSZ_) != wst->iq.end; ++i) {
+	for(unsigned int i = wst->iq.start; (i %= wst->iq.size) != wst->iq.end; ++i) {
 		struct t_glfw_inputevent *qev = &wst->iq.queue[i];
 
 		switch(qev->type) {

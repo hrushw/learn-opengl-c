@@ -1,7 +1,6 @@
 #ifndef __H__WINDOW_H___
 #define __H__WINDOW_H___
 
-enum e_iqsz_ { IQSZ_ = 256 };
 enum e_wintype { WIN_DEF, WIN_MAX, WIN_FSCR };
 
 /* Different input data for key press, mouse button press, and scroll events */
@@ -33,11 +32,10 @@ struct t_glfw_inputevent {
 	double mx, my, time;
 };
 
-
 /* Queue keyboard and mouse input events to be evaluated  */
 struct t_glfw_inputqueue {
-	unsigned int start, end;
-	struct t_glfw_inputevent queue[IQSZ_];
+	unsigned int start, end, size;
+	struct t_glfw_inputevent* queue;
 };
 
 /* Global structure for the purpose of being modified by GLFW callback functions */
