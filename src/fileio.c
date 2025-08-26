@@ -18,6 +18,7 @@ enum e_filetobuf_error f_io_filetobuf(
 	/* 4 . Check if buffer is large enough to store the file */
 	/* 5 . Rewind and read contents into buffer */
 	/* read size is only useful on success or failures 4, 5, else set to 0 */
+	/* If read operation fails, set buf[0] = 0 to avoid using corrupted data */
 
 	long l = 0;
 	int ret = ERR_F2B_SUCCESS;
@@ -28,7 +29,7 @@ enum e_filetobuf_error f_io_filetobuf(
 	else if( l > buflen - 1 )
 		ret = ERR_F2B_BUFFER_TOO_SMALL;
 	else if( rewind(f), fread(buf, 1, l, f) != (size_t)l )
-		ret = ERR_F2B_FAILED_READ;
+		buf[0] = 0, ret = ERR_F2B_FAILED_READ;
 	else
 		buf[l] = 0;
 

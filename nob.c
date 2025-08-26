@@ -33,13 +33,6 @@ void _check_assert(int assertion, char* name) {
 #define chk_assert(x) _check_assert(x, #x)
 
 void c_checks(void) {
-	/* I will probably not compile outside of x86_64 for a long time but *
-	 * these cheks may save some nerd centuries in the future attempting *
-	 * to compile this on some esoteric hardware */
-
-	/* I frequently use integers as array indices, and checking  *
-	 * for all such cases and replacing with size_t just in case *
-	 * of 16 bit integers is too much of a pain */
 	chk_assert(sizeof(int) >= 4);
 
 	/* OpenGL requires 32 bit floats */
