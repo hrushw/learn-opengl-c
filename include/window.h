@@ -44,8 +44,10 @@ struct t_glfw_inputqueue {
 struct t_glfw_winstate {
 	unsigned char szrefresh:1;
 	unsigned char runstate:1;
+	unsigned char iqoverflow:1;
 
 	int width, height;
+
 	/* Mouse x, y position */
 	double mx, my;
 	double time;

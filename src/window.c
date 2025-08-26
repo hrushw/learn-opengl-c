@@ -1,39 +1,28 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <stdio.h>
-
 #include "window.h"
 
 /* Append input events to queue to handle later */
-void f_iqappend(struct t_glfw_inputqueue *q, struct t_glfw_inputevent ev) {
-	/* Bounds check for queue just in case */
-	/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
-	if(
+/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
+/* If queue has overflowed, ignore new events until overflow is resolved */
+void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
+	if(wst->iqoverflow) return;
+
+	struct t_glfw_inputqueue *q = &wst->iq;
+	q->queue[q->end] = *ev,
+	q->end = (q->end + 1) % (2*IQSZ_);
+
+	if (
 		q->start >= IQSZ_ || q->end >= 2*IQSZ_ ||
 		q->end >= IQSZ_ + q->start || q->start > q->end
-	) {
-		/* If bounds check fails, log error and reset the queue */
-		fprintf(stderr,
-			"ERROR: Key press queue indices out of bounds!\n"
-			"(start index = %d, end index = %d, max queue size = %d)\n",
-			q->start, q->end, IQSZ_
-		);
-		q->start = 0, q->end = 0;
-	}
-
-	q->queue[q->end] = ev;
-	q->end = (q->end + 1) % (2*IQSZ_);
+	)
+		wst->iqoverflow = 1;
 }
 
 /* ----------------------- *
  * GLFW Callback functions *
  * ----------------------- */
-
-/* Log errors */
-void f_glfw_callback_error(int err, const char* desc) {
-	fprintf(stderr, "GLFW Error: \n%s\n(Error code - %d)\n", desc, err);
-}
 
 /* Key callback: add pressed key to queue for evaluation */
 /* Additionally store mouse coordinates */
@@ -46,7 +35,7 @@ void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, 
 		wst->mx, wst->my, wst->time
 	};
 
-	f_iqappend(&wst->iq, e);
+	f_iqappend(wst, &e);
 
 	/* Scancode remains unused */
 	(void)scancode;
@@ -69,7 +58,7 @@ void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int 
 		wst->mx, wst->my, wst->time
 	};
 
-	f_iqappend(&wst->iq, e);
+	f_iqappend(wst, &e);
 }
 
 /* Scroll callback: add event to queue */
@@ -82,7 +71,7 @@ void f_glfw_callback_scroll(GLFWwindow* window, double xoffset, double yoffset) 
 		wst->mx, wst->my, wst->time
 	};
 
-	f_iqappend(&wst->iq, e);
+	f_iqappend(wst, &e);
 }
 
 /* Callback for framebuffer resize events (i.e window resize events) */

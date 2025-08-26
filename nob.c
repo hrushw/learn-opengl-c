@@ -5,8 +5,6 @@
 #include <limits.h>
 #include <string.h>
 
-#include "include/memarena.h"
-
 #define _LEN(x) (sizeof ((x))/ sizeof (*(x)))
 #define _STRARR(...) (const char* []) {__VA_ARGS__}
 #define CHECK_REBUILD(output, ...) nob_needs_rebuild(output, _STRARR(__VA_ARGS__), _LEN( (_STRARR(__VA_ARGS__)) ) )
@@ -49,13 +47,16 @@ void c_checks(void) {
 
 	chk_assert(CHAR_BIT == 8);
 
+	/*
 	printf("sizeof t_arena_cell == %d\n", sizeof(t_arena_cell));
 
 	chk_assert(sizeof(struct t_mem_arena) % sizeof(t_arena_cell) == 0);
+	*/
 }
 
 int main(int argc, char* argv[]) {
-	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h", "include/memarena.h");
+	// NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h", "include/memarena.h");
+	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h");
 
 	Nob_Cmd cmd = {0};
 
@@ -97,10 +98,12 @@ int main(int argc, char* argv[]) {
 		if(!nob_cmd_run(&cmd)) return -1;
 	}
 
+	/*
 	if(CHECK_REBUILD_WITH_NOB("obj/memarena.o", "src/memarena.c", "include/memarena.h")) {
 		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/memarena.c", "-o", "obj/memarena.o");
 		if(!nob_cmd_run(&cmd)) return -1;
 	}
+	*/
 
 	if(CHECK_REBUILD_WITH_NOB("obj/fileio.o", "src/fileio.c", "include/fileio.h")) {
 		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/fileio.c", "-o", "obj/fileio.o");

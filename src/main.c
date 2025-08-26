@@ -1,11 +1,11 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include <stdio.h>
+
 #include "window.h"
 
 void f_render_main(void* win);
-
-void f_glfw_callback_error(int, const char*);
 
 void* f_glfw_initwin (
 	const char*, int, int,
@@ -22,25 +22,23 @@ struct t_glfw_winstate ws = {
 	},
 	.szrefresh = 1,
 	.runstate = 1,
+	.iqoverflow = 0,
 };
+
+void f_glfw_callback_error(int err, const char* desc) {
+	fprintf(stderr, "GLFW Error: \n%s\n(Error code - %d)\n", desc, err);
+}
 
 /* Attempt initialization of GLFW and the window, exit if unsuccessful */
 int main(void) {
-	int status = 0;
-
 	glfwSetErrorCallback(f_glfw_callback_error);
 	if(!glfwInit()) return -1;
 
 	void* win = f_glfw_initwin("Tetrahedron", 640, 480, WIN_MAX, &ws);
-	if(!win) {
-		status = -2;
-		goto end;
-	}
+	if(!win) return glfwTerminate(), -2;
 
 	f_render_main(win);
 
 	glfwDestroyWindow(win);
-
-	end: glfwTerminate();
-	return status;
+	return glfwTerminate(), 0;
 }
