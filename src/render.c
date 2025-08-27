@@ -9,33 +9,30 @@
 #include "shader.h"
 #include "errorlog.h"
 
-void f_render_main(void* win) {
+unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_src { BUFSZ_SRC = 0x2000 };
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
 
 	static char chbuf[ 2*BUFSZ_SRC + 3*BUFSZ_LOG ] = {0};
 
-	char* vert_src = chbuf;
-	char* frag_src = chbuf + BUFSZ_SRC;
-	char* vert_log = chbuf + 2*BUFSZ_SRC;
-	char* frag_log = chbuf + 2*BUFSZ_SRC + BUFSZ_LOG;
-	char* prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
+	static char* vert_src = chbuf;
+	static char* frag_src = chbuf + BUFSZ_SRC;
+	static char* vert_log = chbuf + 2*BUFSZ_SRC;
+	static char* frag_log = chbuf + 2*BUFSZ_SRC + BUFSZ_LOG;
+	static char* prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
 
 	unsigned int len = 0;
-	const char* path;
-	unsigned int ret;
+	int ret;
 
-	path = "shaders/vertex.glsl";
-	ret = f_io_filetobuf(path, &len, vert_src, BUFSZ_SRC);
-	f_error_log_f2b(ret, path, BUFSZ_SRC, len);
+	ret = f_io_filetobuf(vertpath, &len, vert_src, BUFSZ_SRC);
+	f_error_log_f2b(ret, vertpath, BUFSZ_SRC, len);
 
 	unsigned int vert = 0;
 	ret = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len);
 	f_error_log_shader(ret, GL_VERTEX_SHADER, vert_log, len);
 
-	path = "shaders/fragment.glsl";
-	ret = f_io_filetobuf(path, &len, frag_src, BUFSZ_SRC);
-	f_error_log_f2b(ret, path, BUFSZ_SRC, len);
+	ret = f_io_filetobuf(fragpath, &len, frag_src, BUFSZ_SRC);
+	f_error_log_f2b(ret, fragpath, BUFSZ_SRC, len);
 
 	unsigned int frag = 0;
 	ret = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len);
@@ -44,6 +41,12 @@ void f_render_main(void* win) {
 	unsigned int sp = 0;
 	ret = f_gl_genprogram(&sp, vert, frag, prog_log, BUFSZ_LOG, &len);
 	f_error_log_program(ret, prog_log, len);
+
+	return sp;
+}
+
+void f_render_main(void* win) {
+	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
 
