@@ -18,8 +18,8 @@
 	#define M_CC "gcc", "-Wall", "-Wextra", "-Wpedantic", "-Wswitch", "-Wvla"
 #endif
 
-#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/shader.o", "obj/main.o", "obj/fileio.o"
-#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h", "include/fileio.h"
+#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/shader.o", "obj/main.o", "obj/fileio.o", "obj/errorlog.o"
+#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h", "include/fileio.h", "include/errorlog.o"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
@@ -100,6 +100,11 @@ int main(int argc, char* argv[]) {
 
 	if(CHECK_REBUILD_WITH_NOB("obj/fileio.o", "src/fileio.c", "include/fileio.h")) {
 		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/fileio.c", "-o", "obj/fileio.o");
+		if(!nob_cmd_run(&cmd)) return -1;
+	}
+
+	if(CHECK_REBUILD_WITH_NOB("obj/errorlog.o", "src/errorlog.c", "include/errorlog.h", "include/fileio.h", "include/shader.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/errorlog.c", "-o", "obj/errorlog.o");
 		if(!nob_cmd_run(&cmd)) return -1;
 	}
 
