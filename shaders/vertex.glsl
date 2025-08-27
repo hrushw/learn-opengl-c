@@ -1,16 +1,12 @@
 #version 460 core
 
-layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 in_clr;
-layout(location = 2) in vec2 texcoord;
+layout(location = 0) in vec2 pos;
+layout(location = 1) in vec3 clr_in;
 
-out vec3 color;
-out vec2 tex_crd;
-
-uniform mat4 transform;
+out vec3 clr;
 
 void main() {
-	gl_Position = transform * vec4(pos, 1.0f);
-	color = in_clr;
-	tex_crd = texcoord;
+	gl_Position = vec4(pos, 0.0f, 1.0f);
+	clr = clr_in;
 }
+
