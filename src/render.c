@@ -75,9 +75,9 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 }
 
 const float vertices[] = {
-	-0.5f, -0.3f, 1.0f, 0.0f, 0.0f,
-	0.5f, -0.3f, 0.0f, 1.0f, 0.0f,
-	0.0f, 0.45f, 0.0f, 0.0f, 1.0f
+	-0.6f, -0.3f, 1.0f, 0.0f, 0.0f,
+	0.6f, -0.3f, 0.0f, 1.0f, 0.0f,
+	0.0f, 0.62f, 0.0f, 0.0f, 1.0f
 };
 
 void f_render_main(void* win) {
@@ -92,7 +92,7 @@ void f_render_main(void* win) {
 	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
 	glUseProgram(sp);
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
@@ -105,7 +105,11 @@ void f_render_main(void* win) {
 	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
 		if(wst->szrefresh) {
 			wst->szrefresh = 0;
-			glViewport(0, 0, wst->width, wst->height);
+
+			if(wst->width > wst->height)
+				glViewport((wst->width - wst->height) / 2, 0, wst->height, wst->height);
+			else
+				glViewport(0, (wst->height - wst->width) / 2, wst->width, wst->width);
 		}
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
