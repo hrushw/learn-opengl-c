@@ -9,6 +9,31 @@
 #include "shader.h"
 #include "errorlog.h"
 
+const char* vertex_src =
+"#version 460 core\n"
+"\n"
+"layout(location = 0) in vec2 pos;\n"
+"layout(location = 1) in vec3 clr_in;\n"
+"\n"
+"out vec3 clr;"
+"\n"
+"void main() {\n"
+"	gl_Position = vec4(pos, 0.0f, 1.0f);\n"
+"	clr = clr_in;\n"
+"}\n"
+;
+
+const char* fragment_src =
+"#version 460 core\n"
+"\n"
+"in vec3 clr;"
+"\n"
+"out vec4 frag_clr;"
+"void main() {\n"
+"	frag_clr = vec4(clr, 1.0f);\n"
+"}\n"
+;
+
 unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath) {
 	enum e_bufsz_src { BUFSZ_SRC = 0x2000 };
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
@@ -22,20 +47,24 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 	static char* prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
 
 	unsigned int len = 0;
-	int ret;
+	int ret = 0;
 
+	/*
 	ret = f_io_filetobuf(vertpath, &len, vert_src, BUFSZ_SRC);
 	f_error_log_f2b(ret, vertpath, BUFSZ_SRC, len);
+	*/
 
 	unsigned int vert = 0;
-	ret = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len);
+	ret = f_gl_genshader(&vert, GL_VERTEX_SHADER, vertex_src, vert_log, BUFSZ_LOG, &len);
 	f_error_log_shader(ret, GL_VERTEX_SHADER, vert_log, len);
 
+	/*
 	ret = f_io_filetobuf(fragpath, &len, frag_src, BUFSZ_SRC);
 	f_error_log_f2b(ret, fragpath, BUFSZ_SRC, len);
+	*/
 
 	unsigned int frag = 0;
-	ret = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len);
+	ret = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, fragment_src, frag_log, BUFSZ_LOG, &len);
 	f_error_log_shader(ret, GL_FRAGMENT_SHADER, frag_log, len);
 
 	unsigned int sp = 0;
@@ -45,13 +74,42 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 	return sp;
 }
 
+const float vertices[] = {
+	-0.5f, -0.3f, 1.0f, 0.0f, 0.0f,
+	0.5f, -0.3f, 0.0f, 1.0f, 0.0f,
+	0.0f, 0.45f, 0.0f, 0.0f, 1.0f
+};
+
 void f_render_main(void* win) {
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	unsigned int VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
 	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
+	glUseProgram(sp);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_DYNAMIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
 
 	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
+		if(wst->szrefresh) {
+			wst->szrefresh = 0;
+			glViewport(0, 0, wst->width, wst->height);
+		}
 
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
