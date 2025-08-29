@@ -51,6 +51,26 @@ const float vertices[] = {
 	0.0f, 0.62f, 0.0f, 0.0f, 1.0f
 };
 
+void f_log_input_type(struct t_glfw_inputevent *ev) {
+	switch(ev->type) {
+	case IEV_KEYPRESS:
+		fprintf(stderr, "Recieved keyboard input event!\n");
+		break;
+
+	case IEV_MOUSEBUTTON:
+		fprintf(stderr, "Recieved mouse click input event!\n");
+		break;
+
+	case IEV_SCROLL:
+		fprintf(stderr, "Recieved scroll input event!\n");
+		break;
+
+	default:
+		fprintf(stderr, "ERROR: Recieved unknown input event!\n");
+	}
+}
+
+
 void f_render_main(void* win) {
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
@@ -90,13 +110,19 @@ void f_render_main(void* win) {
 
 		if(wst->iqoverflow) {
 			fprintf(stderr,
-				"ERROR: Key press queue indices out of bounds! clearing...\n"
-				"(start index = %d, end index = %d, max queue size = %d)\n",
-				wst->iq.start, wst->iq.end, IQSZ_
+				"ERROR: Key press queue indices out of bounds! logging first input...\n"
+				"(start index = %d, queue length = %d, max queue size = %d)\n",
+				wst->iq.start, wst->iq.length, IQSZ_
 			);
+			/* Pop first 10 items from queue */
+			for(int i = 0; i < 10; ++i) {
+				struct t_glfw_inputevent ev = wst->iq.queue[wst->iq.start];
+				wst->iq.start = (wst->iq.start + 1) % IQSZ_;
+				wst->iq.length --;
 
-			wst->iq.start = 0;
-			wst->iq.end = 0;
+				f_log_input_type(&ev);
+			}
+
 			wst->iqoverflow = 0;
 		}
 	}

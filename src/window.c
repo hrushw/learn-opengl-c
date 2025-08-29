@@ -4,20 +4,15 @@
 #include "window.h"
 
 /* Append input events to queue to handle later */
-/* start must be bounded to [0, IQSZ_-1], while end must be bounded to [0, 2*IQSZ_-1] */
-/* If queue has overflowed, ignore new events until overflow is resolved */
 void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
 	if(wst->iqoverflow) return;
-
 	struct t_glfw_inputqueue *q = &wst->iq;
-	q->queue[q->end] = *ev,
-	q->end = (q->end + 1) % (2*IQSZ_);
 
-	if (
-		q->start >= IQSZ_ || q->end >= 2*IQSZ_ ||
-		q->end >= IQSZ_ + q->start || q->start > q->end
-	)
-		wst->iqoverflow = 1;
+	q->queue [(q->start + q->length) % IQSZ_] = *ev;
+	q->length += 1;
+	if(q->length >= IQSZ_) wst->iqoverflow = 1;
+
+	q->start %= IQSZ_;
 }
 
 /* ----------------------- *

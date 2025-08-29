@@ -15,7 +15,11 @@ struct t_glfw_inputevent_scroll {
 	double sx, sy;
 };
 
-enum e_inputevent_type { IEV_KEYPRESS, IEV_MOUSEBUTTON, IEV_SCROLL };
+enum e_inputevent_type {
+	IEV_KEYPRESS = 1,
+	IEV_MOUSEBUTTON = 2,
+	IEV_SCROLL = 3
+};
 
 /* Tagged union for storing multiple types of input events in a single queue */
 struct t_glfw_inputevent {
@@ -36,7 +40,7 @@ struct t_glfw_inputevent {
 
 /* Queue keyboard and mouse input events to be evaluated  */
 struct t_glfw_inputqueue {
-	unsigned int start, end;
+	unsigned int start, length;
 	struct t_glfw_inputevent queue[IQSZ_];
 };
 

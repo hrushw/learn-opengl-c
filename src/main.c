@@ -17,7 +17,7 @@ struct t_glfw_winstate ws = {
 	.mx = 0, .my = 0,
 	.time = 0,
 	.iq = {
-		.start = 0, .end = 0,
+		.start = 0, .length = 0,
 		.queue = {{0}}
 	},
 	.szrefresh = 1,
