@@ -70,6 +70,11 @@ void f_log_input_type(struct t_glfw_inputevent *ev) {
 	}
 }
 
+void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_inputqueue *iq) {
+	*ev = iq->queue[iq->start];
+	iq->start = (iq->start + 1) % IQSZ_;
+	iq->length --;
+}
 
 void f_render_main(void* win) {
 	unsigned int VBO;
@@ -116,10 +121,8 @@ void f_render_main(void* win) {
 			);
 			/* Pop first 10 items from queue */
 			for(int i = 0; i < 10; ++i) {
-				struct t_glfw_inputevent ev = wst->iq.queue[wst->iq.start];
-				wst->iq.start = (wst->iq.start + 1) % IQSZ_;
-				wst->iq.length --;
-
+				struct t_glfw_inputevent ev;
+				f_iqpop(&ev, &wst->iq);
 				f_log_input_type(&ev);
 			}
 

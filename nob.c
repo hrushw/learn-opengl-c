@@ -2,6 +2,8 @@
 #define NOB_WARN_DEPRECATED
 #include "nob.h"
 
+#include "include/window.h"
+
 #include <string.h>
 
 #define _LEN(x) (sizeof ((x))/ sizeof (*(x)))
@@ -19,7 +21,7 @@
 #endif
 
 #define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/shader.o", "obj/main.o", "obj/fileio.o", "obj/errorlog.o"
-#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h", "include/fileio.h", "include/errorlog.o"
+#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h", "include/fileio.h", "include/errorlog.h"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
@@ -29,7 +31,7 @@ void _die(const char* msg, int ret) {
 }
 
 int main(int argc, char* argv[]) {
-	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h");
+	NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "nob.h", "include/window.h");
 
 	Nob_Cmd cmd = {0};
 
@@ -45,6 +47,11 @@ int main(int argc, char* argv[]) {
 			return -1;
 		}
 	}
+
+	printf("sizeof(struct t_glfw_winstate) = %lu\n", sizeof(struct t_glfw_winstate));
+	printf("sizeof(struct t_glfw_inputqueue) = %lu\n", sizeof(struct t_glfw_inputqueue));
+	printf("sizeof(struct t_glfw_inputevent) = %lu\n", sizeof(struct t_glfw_inputevent));
+	printf("sizeof(union t_glfw_inputevent_u_) = %lu\n", sizeof(union t_glfw_inputevent_u_));
 
 	/* Check for updates and recompile object files */
 	if(CHECK_REBUILD_WITH_NOB("obj/main.o", "src/main.c", "include/window.h"))
