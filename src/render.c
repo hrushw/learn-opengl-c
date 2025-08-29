@@ -3,6 +3,7 @@
 #include <epoxy/gl.h>
 
 #include <stdio.h>
+#include <stddef.h>
 
 #include "window.h"
 #include "fileio.h"
@@ -15,11 +16,11 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 
 	static char chbuf[ 2*BUFSZ_SRC + 3*BUFSZ_LOG ] = {0};
 
-	static char* vert_src = chbuf;
-	static char* frag_src = chbuf + BUFSZ_SRC;
-	static char* vert_log = chbuf + 2*BUFSZ_SRC;
-	static char* frag_log = chbuf + 2*BUFSZ_SRC + BUFSZ_LOG;
-	static char* prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
+	static char* const vert_src = chbuf;
+	static char* const frag_src = chbuf + BUFSZ_SRC;
+	static char* const vert_log = chbuf + 2*BUFSZ_SRC;
+	static char* const frag_log = chbuf + 2*BUFSZ_SRC + BUFSZ_LOG;
+	static char* const prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
 
 	unsigned int len = 0;
 	int ret = 0;
@@ -45,10 +46,15 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 	return sp;
 }
 
-const float vertices[] = {
-	-0.6f, -0.3f, 1.0f, 0.0f, 0.0f,
-	0.6f, -0.3f, 0.0f, 1.0f, 0.0f,
-	0.0f, 0.62f, 0.0f, 0.0f, 1.0f
+struct vert {
+	float pos[2];
+	unsigned char rgb[3];
+};
+
+const struct vert vertices[] = {
+	{ { -0.6f, - 0.3f }, { 0xFF, 0x00, 0x00 } },
+	{ {  0.6f, - 0.3f }, { 0x00, 0xFF, 0x00 } },
+	{ {  0.0f,  0.62f }, { 0x00, 0x00, 0xFF } },
 };
 
 void f_log_input_type(struct t_glfw_inputevent *ev) {
@@ -91,10 +97,10 @@ void f_render_main(void* win) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(struct vert), (void*)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, rgb)));
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
 

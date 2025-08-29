@@ -5,12 +5,12 @@
 #include "include/window.h"
 
 #include <string.h>
+#include <stddef.h>
 
 #define _LEN(x) (sizeof ((x))/ sizeof (*(x)))
 #define _STRARR(...) (const char* []) {__VA_ARGS__}
 #define CHECK_REBUILD(output, ...) nob_needs_rebuild(output, _STRARR(__VA_ARGS__), _LEN( (_STRARR(__VA_ARGS__)) ) )
 #define CHECK_REBUILD_WITH_NOB(output, ...) CHECK_REBUILD(output, "nob.c", "nob.h", __VA_ARGS__)
-#define CMD_APPEND_RUN_RESET(cmd, ...) { nob_cmd_append(cmd, __VA_ARGS__); if(!nob_cmd_run(cmd)) _die("ERROR: Command failed!\n", -1); }
 
 #define DEBUG 0
 
@@ -28,6 +28,19 @@
 void _die(const char* msg, int ret) {
 	fprintf(stderr, "%s\n", msg);
 	exit(ret);
+}
+
+void try_run(Nob_Cmd *cmd) {
+	if(!nob_cmd_run(cmd)) exit(-1);
+}
+
+#define _TEST(chk) _chk_assert(chk, #chk)
+
+void _chk_assert(int chk, const char* msg) {
+	if(chk)
+		fprintf(stderr, "[Check]: %s passed, continuing...\n", msg);
+	else
+		fprintf(stderr, "[Check]: %s FAILED, exiting...\n", msg), exit(-1);
 }
 
 int main(int argc, char* argv[]) {
@@ -48,36 +61,59 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+
+	putchar('\n');
+	_TEST(CHAR_BIT == 8);
+	_TEST(sizeof(float) == 4);
+	_TEST(sizeof(unsigned int) >= 4);
+	putchar('\n');
 	printf("sizeof(struct t_glfw_winstate) = %lu\n", sizeof(struct t_glfw_winstate));
 	printf("sizeof(struct t_glfw_inputqueue) = %lu\n", sizeof(struct t_glfw_inputqueue));
 	printf("sizeof(struct t_glfw_inputevent) = %lu\n", sizeof(struct t_glfw_inputevent));
 	printf("sizeof(union t_glfw_inputevent_u_) = %lu\n", sizeof(union t_glfw_inputevent_u_));
+	putchar('\n');
 
 	/* Check for updates and recompile object files */
-	if(CHECK_REBUILD_WITH_NOB("obj/main.o", "src/main.c", "include/window.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/main.c", "-o", "obj/main.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/main.o", "src/main.c", "include/window.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/main.c", "-o", "obj/main.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/window.o", "src/window.c", "include/window.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/window.c", "-o", "obj/window.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/window.o", "src/window.c", "include/window.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/window.c", "-o", "obj/window.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/vector.o", "src/vector.c", "include/vector.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/vector.c", "-o", "obj/vector.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/vector.o", "src/vector.c", "include/vector.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/vector.c", "-o", "obj/vector.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/shader.o", "src/shader.c", "include/shader.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/shader.o", "src/shader.c", "include/shader.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/fileio.o", "src/fileio.c", "include/fileio.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/fileio.c", "-o", "obj/fileio.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/fileio.o", "src/fileio.c", "include/fileio.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/fileio.c", "-o", "obj/fileio.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/errorlog.o", "src/errorlog.c", "include/errorlog.h", "include/fileio.h", "include/shader.h"))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/errorlog.c", "-o", "obj/errorlog.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/errorlog.o", "src/errorlog.c", "include/errorlog.h", "include/fileio.h", "include/shader.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/errorlog.c", "-o", "obj/errorlog.o");
+		try_run(&cmd);
+	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", M_HEADERS))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o")
+	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", M_HEADERS)) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
+		try_run(&cmd);
+	}
 
 	/* Recompile final executable from objects */
-	if(CHECK_REBUILD_WITH_NOB("render", M_OBJS))
-		CMD_APPEND_RUN_RESET(&cmd, M_CC, M_LFLAGS, M_OBJS, "-o", "render")
+	if(CHECK_REBUILD_WITH_NOB("render", M_OBJS)) {
+		nob_cmd_append(&cmd, M_CC, M_LFLAGS, M_OBJS, "-o", "render");
+		try_run(&cmd);
+	}
 
 	nob_cmd_free(cmd);
 	return 0;

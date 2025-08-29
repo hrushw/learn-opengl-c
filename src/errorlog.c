@@ -2,6 +2,8 @@
 #include <stdio.h>
 
 #include "errorlog.h"
+#include "fileio.h"
+#include "shader.h"
 
 void f_error_log_f2b(enum e_filetobuf_error ret, const char* path, unsigned int buflen, unsigned int flen) {
 	switch(ret & ~ERR_F2B_FAILED_CLOSE) {
