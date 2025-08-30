@@ -16,10 +16,10 @@ struct t_glfw_winstate ws = {
 	.width = 0, .height = 0,
 	.mx = 0, .my = 0,
 	.time = 0,
-	.iq = {
-		.start = 0, .length = 0, .maxsz = 0,
-		.queue = 0
-	},
+
+	.iqstart = 0, .iqlength = 0, .iqmaxsz = 0,
+	.iq = 0,
+
 	.szrefresh = 1,
 	.runstate = 1,
 	.iqoverflow = 0,

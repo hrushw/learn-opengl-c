@@ -18,4 +18,7 @@ void f_error_log_program (
 	enum e_gl_shader_check, char*, unsigned int
 );
 
+void f_error_log_queue(struct t_glfw_winstate *);
+void f_log_input_type(struct t_glfw_inputevent *);
+
 #endif

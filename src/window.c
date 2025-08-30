@@ -5,15 +5,13 @@
 
 /* Append input events to queue to handle later */
 void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
-	if(wst->iqoverflow || !wst->iq.queue) return;
+	if(wst->iqoverflow || !wst->iq) return;
 
-	struct t_glfw_inputqueue *q = &wst->iq;
+	wst->iq [(wst->iqstart + wst->iqlength) % wst->iqmaxsz] = *ev;
+	wst->iqlength += 1;
+	if(wst->iqlength >= wst->iqmaxsz) wst->iqoverflow = 1;
 
-	q->queue [(q->start + q->length) % q->maxsz] = *ev;
-	q->length += 1;
-	if(q->length >= q->maxsz) wst->iqoverflow = 1;
-
-	q->start %= q->maxsz;
+	wst->iqstart %= wst->iqmaxsz;
 }
 
 /* ----------------------- *

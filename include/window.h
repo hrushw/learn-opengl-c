@@ -34,13 +34,6 @@ struct t_glfw_inputevent {
 	enum e_inputevent_type type;
 };
 
-
-/* Queue keyboard and mouse input events to be evaluated  */
-struct t_glfw_inputqueue {
-	unsigned int start, length, maxsz;
-	struct t_glfw_inputevent *queue;
-};
-
 /* Global structure for the purpose of being modified by GLFW callback functions */
 struct t_glfw_winstate {
 	unsigned char szrefresh:1;
@@ -53,7 +46,8 @@ struct t_glfw_winstate {
 	double mx, my;
 	double time;
 
-	struct t_glfw_inputqueue iq;
+	unsigned int iqstart, iqlength, iqmaxsz;
+	struct t_glfw_inputevent *iq;
 };
 
 #endif

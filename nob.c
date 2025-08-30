@@ -68,7 +68,6 @@ int main(int argc, char* argv[]) {
 	_TEST(sizeof(unsigned int) >= 4);
 	putchar('\n');
 	printf("sizeof(struct t_glfw_winstate) = %lu\n", sizeof(struct t_glfw_winstate));
-	printf("sizeof(struct t_glfw_inputqueue) = %lu\n", sizeof(struct t_glfw_inputqueue));
 	printf("sizeof(struct t_glfw_inputevent) = %lu\n", sizeof(struct t_glfw_inputevent));
 	printf("sizeof(union t_glfw_inputevent_u_) = %lu\n", sizeof(union t_glfw_inputevent_u_));
 	putchar('\n');

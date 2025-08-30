@@ -1,11 +1,15 @@
 #include <epoxy/gl.h>
 #include <stdio.h>
 
+#include "window.h"
 #include "errorlog.h"
 #include "fileio.h"
 #include "shader.h"
 
-void f_error_log_f2b(enum e_filetobuf_error ret, const char* path, unsigned int buflen, unsigned int flen) {
+void f_error_log_f2b(
+	enum e_filetobuf_error ret, const char* path,
+	unsigned int buflen, unsigned int flen
+) {
 	switch(ret & ~ERR_F2B_FAILED_CLOSE) {
 	case ERR_F2B_ZERO_SIZE_BUFFER:
 		fprintf(stderr, "ERROR: Cannot read into zero sized buffer!\n");
@@ -52,7 +56,10 @@ void f_error_log_f2b(enum e_filetobuf_error ret, const char* path, unsigned int 
 		fprintf(stderr, "ERROR: Failed to close file '%s'\n", path);
 }
 
-void f_error_log_shader(enum e_gl_shader_check ret, int type, char* logbuf, unsigned int loglen) {
+void f_error_log_shader(
+	enum e_gl_shader_check ret, int type,
+	char* logbuf, unsigned int loglen
+) {
 	const char* typestr;
 	switch(type) {
 	case GL_VERTEX_SHADER:
@@ -117,6 +124,35 @@ void f_error_log_program(
 
 	default:
 		fprintf(stderr, "ERROR: Invalid return from function 'f_gl_genprogram'!\n");
+	}
+}
+
+void f_error_log_queue(struct t_glfw_winstate *wst) {
+	if(!wst->iq) return;
+
+	fprintf(stderr,
+		"[LOG]: Input queue properties:\n"
+		"start index = %d, size = %d, max size = %d\n",
+		wst->iqstart, wst->iqlength, wst->iqmaxsz
+	);
+}
+
+void f_log_input_type(struct t_glfw_inputevent *ev) {
+	switch(ev->type) {
+	case IEV_KEYPRESS:
+		fprintf(stderr, "Recieved keyboard input event!\n");
+		break;
+
+	case IEV_MOUSEBUTTON:
+		fprintf(stderr, "Recieved mouse click input event!\n");
+		break;
+
+	case IEV_SCROLL:
+		fprintf(stderr, "Recieved scroll input event!\n");
+		break;
+
+	default:
+		fprintf(stderr, "ERROR: Recieved unknown input event!\n");
 	}
 }
 

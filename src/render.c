@@ -15,7 +15,7 @@
 
 #include "vector.h"
 
-enum e_iqsz_ { IQSZ_ = 256 };
+enum e_iqsz_ { IQSZ_ = 512 };
 struct t_glfw_inputevent wsqueue[IQSZ_];
 
 unsigned int f_render_genprogram(void) {
@@ -83,33 +83,13 @@ uint32_t indices[] = {
 	1, 2, 3,
 	4, 5, 6,
 	5, 6, 7,
-
 	8, 9, 10
 };
 
-void f_log_input_type(struct t_glfw_inputevent *ev) {
-	switch(ev->type) {
-	case IEV_KEYPRESS:
-		fprintf(stderr, "Recieved keyboard input event!\n");
-		break;
-
-	case IEV_MOUSEBUTTON:
-		fprintf(stderr, "Recieved mouse click input event!\n");
-		break;
-
-	case IEV_SCROLL:
-		fprintf(stderr, "Recieved scroll input event!\n");
-		break;
-
-	default:
-		fprintf(stderr, "ERROR: Recieved unknown input event!\n");
-	}
-}
-
-void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_inputqueue *iq) {
-	*ev = iq->queue[iq->start];
-	iq->start = (iq->start + 1) % iq->maxsz;
-	iq->length --;
+void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_winstate *wst) {
+	*ev = wst->iq[wst->iqstart];
+	wst->iqstart = (wst->iqstart + 1) % wst->iqmaxsz;
+	wst->iqlength --;
 }
 
 int f_event_cmp_key(struct t_glfw_inputevent *ev, int key, int mods, int action) {
@@ -155,8 +135,8 @@ void f_render_main(void* win) {
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, rgb)));
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
-	wst->iq.maxsz = IQSZ_;
-	wst->iq.queue = wsqueue;
+	wst->iqmaxsz = IQSZ_;
+	wst->iq = wsqueue;
 
 	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
 		if(wst->szrefresh) {
@@ -176,25 +156,17 @@ void f_render_main(void* win) {
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
-		for(unsigned int i = 0; i < wst->iq.length; ++i) {
+		for(unsigned int i = 0; i < wst->iqlength; ++i) {
 			struct t_glfw_inputevent ev;
-			f_iqpop(&ev, &wst->iq);
+			f_iqpop(&ev, wst);
 			f_render_evalevent(wst, &ev);
 		}
 
 		if(wst->iqoverflow) {
-			fprintf(stderr,
-				"ERROR: Key press queue indices out of bounds! logging first input...\n"
-				"(start index = %d, queue length = %d, max queue size = %d)\n",
-				wst->iq.start, wst->iq.length, wst->iq.maxsz
-			);
-			/* Pop first 10 items from queue */
-			for(int i = 0; i < 10; ++i) {
-				struct t_glfw_inputevent ev;
-				f_iqpop(&ev, &wst->iq);
-				f_log_input_type(&ev);
-			}
-
+			fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n");
+			fprintf(stderr, "Discarding top items from queue...\n");
+			f_error_log_queue(wst);
+			wst->iqlength = wst->iqmaxsz - 0x10;
 			wst->iqoverflow = 0;
 		}
 	}
