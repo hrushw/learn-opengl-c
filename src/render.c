@@ -3,6 +3,8 @@
 #include <epoxy/gl.h>
 
 #include <stdio.h>
+#include <math.h>
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -11,7 +13,15 @@
 #include "shader.h"
 #include "errorlog.h"
 
-unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath) {
+#include "vector.h"
+
+enum e_iqsz_ { IQSZ_ = 256 };
+struct t_glfw_inputevent wsqueue[IQSZ_];
+
+unsigned int f_render_genprogram(void) {
+	const char* vertpath = "shaders/vertex.glsl";
+	const char* fragpath = "shaders/fragment.glsl";
+
 	enum e_bufsz_src { BUFSZ_SRC = 0x2000 };
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
 
@@ -98,8 +108,19 @@ void f_log_input_type(struct t_glfw_inputevent *ev) {
 
 void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_inputqueue *iq) {
 	*ev = iq->queue[iq->start];
-	iq->start = (iq->start + 1) % IQSZ_;
+	iq->start = (iq->start + 1) % iq->maxsz;
 	iq->length --;
+}
+
+int f_event_cmp_key(struct t_glfw_inputevent *ev, int key, int mods, int action) {
+	if(ev->type != IEV_KEYPRESS) return 0;
+	struct t_glfw_inputevent_key *k = &ev->data.key_ev;
+	return (k->key == key) && (k->action == action) && (k->mods == mods);
+}
+
+void f_render_evalevent(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
+	if(f_event_cmp_key(ev, GLFW_KEY_Q, GLFW_MOD_CONTROL, GLFW_PRESS))
+		wst->runstate = 0;
 }
 
 void f_render_main(void* win) {
@@ -115,7 +136,7 @@ void f_render_main(void* win) {
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
+	unsigned int sp = f_render_genprogram();
 	glUseProgram(sp);
 
 	int scaleloc = glGetUniformLocation(sp, "scale");
@@ -134,6 +155,8 @@ void f_render_main(void* win) {
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, rgb)));
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
+	wst->iq.maxsz = IQSZ_;
+	wst->iq.queue = wsqueue;
 
 	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
 		if(wst->szrefresh) {
@@ -153,11 +176,17 @@ void f_render_main(void* win) {
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
+		for(unsigned int i = 0; i < wst->iq.length; ++i) {
+			struct t_glfw_inputevent ev;
+			f_iqpop(&ev, &wst->iq);
+			f_render_evalevent(wst, &ev);
+		}
+
 		if(wst->iqoverflow) {
 			fprintf(stderr,
 				"ERROR: Key press queue indices out of bounds! logging first input...\n"
 				"(start index = %d, queue length = %d, max queue size = %d)\n",
-				wst->iq.start, wst->iq.length, IQSZ_
+				wst->iq.start, wst->iq.length, wst->iq.maxsz
 			);
 			/* Pop first 10 items from queue */
 			for(int i = 0; i < 10; ++i) {

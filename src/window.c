@@ -5,14 +5,15 @@
 
 /* Append input events to queue to handle later */
 void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
-	if(wst->iqoverflow) return;
+	if(wst->iqoverflow || !wst->iq.queue) return;
+
 	struct t_glfw_inputqueue *q = &wst->iq;
 
-	q->queue [(q->start + q->length) % IQSZ_] = *ev;
+	q->queue [(q->start + q->length) % q->maxsz] = *ev;
 	q->length += 1;
-	if(q->length >= IQSZ_) wst->iqoverflow = 1;
+	if(q->length >= q->maxsz) wst->iqoverflow = 1;
 
-	q->start %= IQSZ_;
+	q->start %= q->maxsz;
 }
 
 /* ----------------------- *
@@ -25,9 +26,9 @@ void f_glfw_callback_key(GLFWwindow *window, int key, int scancode, int action, 
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
 	struct t_glfw_inputevent e = {
-		IEV_KEYPRESS,
-		{ .key_ev = { key, action, mods } },
-		wst->mx, wst->my, wst->time
+		.type = IEV_KEYPRESS,
+		.data = { .key_ev = { key, action, mods } },
+		.mx = wst->mx, .my = wst->my, .time = wst->time
 	};
 
 	f_iqappend(wst, &e);
@@ -48,9 +49,9 @@ void f_glfw_callback_mouseclick(GLFWwindow *window, int button, int action, int 
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
 	struct t_glfw_inputevent e = {
-		IEV_MOUSEBUTTON,
-		{ .mb_ev = { button, action, mods } },
-		wst->mx, wst->my, wst->time
+		.type = IEV_MOUSEBUTTON,
+		.data = { .mb_ev = { button, action, mods } },
+		.mx = wst->mx, .my = wst->my, .time = wst->time
 	};
 
 	f_iqappend(wst, &e);
@@ -61,9 +62,9 @@ void f_glfw_callback_scroll(GLFWwindow* window, double xoffset, double yoffset) 
 	struct t_glfw_winstate* const wst = glfwGetWindowUserPointer(window);
 
 	struct t_glfw_inputevent e = {
-		IEV_SCROLL,
-		{ .scroll_ev = { xoffset, yoffset } },
-		wst->mx, wst->my, wst->time
+		.type = IEV_SCROLL,
+		.data = { .scroll_ev = { xoffset, yoffset } },
+		.mx = wst->mx, .my = wst->my, .time = wst->time
 	};
 
 	f_iqappend(wst, &e);
