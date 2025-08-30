@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "window.h"
 #include "fileio.h"
@@ -47,14 +48,33 @@ unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath
 }
 
 struct vert {
-	float pos[2];
-	unsigned char rgb[3];
+	int32_t pos[3];
+	uint8_t rgb[3];
 };
 
-const struct vert vertices[] = {
-	{ { -0.6f, - 0.3f }, { 0xFF, 0x00, 0x00 } },
-	{ {  0.6f, - 0.3f }, { 0x00, 0xFF, 0x00 } },
-	{ {  0.0f,  0.62f }, { 0x00, 0x00, 0xFF } },
+struct vert vertices[] = {
+	{ {0, 0, 0}, {0x00, 0x00, 0x7F} },
+	{ {1, 0, 0}, {0x00, 0x00, 0x7F} },
+	{ {0, 1, 0}, {0x7F, 0x3F, 0x3F} },
+	{ {1, 1, 0}, {0x3F, 0x7F, 0x3F} },
+
+	{ {-2, -3, 0}, {0x00, 0x7F, 0x00} },
+	{ {-2, -1, 1}, {0x7F, 0x3F, 0x00} },
+	{ {-1, -2, 0}, {0x00, 0x7F, 0x00} },
+	{ {-1, -1, 0}, {0x00, 0x7F, 0x00} },
+
+	{ {-2,  2, 0}, {0xFF, 0x00, 0x00} },
+	{ {-3,  2, 1}, {0x00, 0xFF, 0x00} },
+	{ {-3,  3, 0}, {0x00, 0x00, 0xFF} },
+};
+
+uint32_t indices[] = {
+	0, 1, 2,
+	1, 2, 3,
+	4, 5, 6,
+	5, 6, 7,
+
+	8, 9, 10
 };
 
 void f_log_input_type(struct t_glfw_inputevent *ev) {
@@ -91,13 +111,24 @@ void f_render_main(void* win) {
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
 	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
 	glUseProgram(sp);
 
+	int scaleloc = glGetUniformLocation(sp, "scale");
+	if(scaleloc < 0) fprintf(stderr,
+		"ERROR: Unable to get location for uniform 'scale'!\n"
+	);
+	glUniform1i(scaleloc, 4);
+
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(struct vert), (void*)0);
+	glVertexAttribPointer(0, 3, GL_INT, GL_FALSE, sizeof(struct vert), (void*)0);
 
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, rgb)));
@@ -108,14 +139,17 @@ void f_render_main(void* win) {
 		if(wst->szrefresh) {
 			wst->szrefresh = 0;
 
+			/*
 			if(wst->width > wst->height)
 				glViewport((wst->width - wst->height) / 2, 0, wst->height, wst->height);
 			else
 				glViewport(0, (wst->height - wst->width) / 2, wst->width, wst->width);
+			*/
+			glViewport(0, 0, wst->width, wst->height);
 		}
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawElements(GL_TRIANGLES, sizeof(indices) / sizeof(*indices), GL_UNSIGNED_INT, (void*)0);
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
