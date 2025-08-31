@@ -13,7 +13,31 @@
 #include "shader.h"
 #include "errorlog.h"
 
-#include "vector.h"
+/* References
+ * ----------
+
+ * OpenGL Tutorials (Victor Gordan)
+ * "https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-"
+
+ * OpenGL for Beginners (OGLDEV)
+ * "https://www.youtube.com/playlist?list=PLA0dXqQjCx0S04ntJKUftl6OaOgsiwHjA"
+ * "https://ogldev.org/index.html"
+
+ * LearnOpenGL
+ * "https://learnopengl.com/Getting-started/Hello-Triangle"
+ * "https://learnopengl.com/Getting-started/Camera"
+
+ * OpenGL 4.6 specification
+ * "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
+
+ * GLFW documentation [window guide]
+ * "https://www.glfw.org/docs/latest/window_guide.html"
+
+ * OpenGL wiki [Rendering Pipeline Overview]
+ * "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
+ */
+
+#define M_LEN(x) (sizeof ((x)) / sizeof (*(x)))
 
 enum e_iqsz_ { IQSZ_ = 512 };
 struct t_glfw_inputevent wsqueue[IQSZ_];
@@ -104,6 +128,8 @@ void f_render_evalevent(struct t_glfw_winstate *wst, struct t_glfw_inputevent *e
 }
 
 void f_render_main(void* win) {
+	/* TODO: cleanup stuff for OpenGL objects */
+	/* currently only creating one set so its fine */
 	unsigned int VBO;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -152,7 +178,7 @@ void f_render_main(void* win) {
 		}
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glDrawElements(GL_TRIANGLES, sizeof(indices) / sizeof(*indices), GL_UNSIGNED_INT, (void*)0);
+		glDrawElements(GL_TRIANGLES, M_LEN(indices), GL_UNSIGNED_INT, (void*)0);
 		glfwSwapBuffers(win);
 		glfwPollEvents();
 
@@ -171,3 +197,9 @@ void f_render_main(void* win) {
 		}
 	}
 }
+
+/*
+TODO: some kind of moving camera shot of a 3d scene of boxes
+currently the linear algebra routines in vector.h only deal with pure floats and 4x4 matrices only
+they can't even apply matrices to vectors, the whole thing needs to be rewritten
+*/
