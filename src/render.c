@@ -30,55 +30,52 @@
  * OpenGL 4.6 specification
  * "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
 
- * GLFW documentation [window guide]
- * "https://www.glfw.org/docs/latest/window_guide.html"
-
  * OpenGL wiki [Rendering Pipeline Overview]
  * "https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview"
  */
 
 #define M_LEN(x) (sizeof ((x)) / sizeof (*(x)))
 
-enum e_iqsz_ { IQSZ_ = 512 };
-struct t_glfw_inputevent wsqueue[IQSZ_];
-
-unsigned int f_render_genprogram(void) {
-	const char* vertpath = "shaders/vertex.glsl";
-	const char* fragpath = "shaders/fragment.glsl";
-
-	enum e_bufsz_src { BUFSZ_SRC = 0x2000 };
+unsigned int f_render_genprogram(char* vert_src, char* frag_src) {
 	enum e_bufsz_log { BUFSZ_LOG = 0x1000 };
 
-	static char chbuf[ 2*BUFSZ_SRC + 3*BUFSZ_LOG ] = {0};
+	static char chbuf[ 3*BUFSZ_LOG ] = {0};
+
+	static char* const vert_log = chbuf;
+	static char* const frag_log = chbuf + BUFSZ_LOG;
+	static char* const prog_log = chbuf + 2*BUFSZ_LOG;
+
+	unsigned int vert = 0, frag = 0, sp = 0;
+	unsigned int len_v = 0, len_f = 0, len_sp = 0;
+
+	int ret_v = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len_v);
+	int ret_f = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len_f);
+	int ret_sp = f_gl_genprogram(&sp, vert, frag, prog_log, BUFSZ_LOG, &len_sp);
+
+	f_error_log_shader(ret_v, GL_VERTEX_SHADER, vert_log, len_v);
+	f_error_log_shader(ret_f, GL_FRAGMENT_SHADER, frag_log, len_f);
+	f_error_log_program(ret_sp, prog_log, len_sp);
+
+	return sp;
+}
+
+unsigned int f_render_genprogram_path(const char* vertpath, const char* fragpath) {
+	enum e_bufsz_src { BUFSZ_SRC = 0x2000 };
+	static char chbuf[ 2*BUFSZ_SRC ] = {0};
 
 	static char* const vert_src = chbuf;
 	static char* const frag_src = chbuf + BUFSZ_SRC;
-	static char* const vert_log = chbuf + 2*BUFSZ_SRC;
-	static char* const frag_log = chbuf + 2*BUFSZ_SRC + BUFSZ_LOG;
-	static char* const prog_log = chbuf + 2*BUFSZ_SRC + 2*BUFSZ_LOG;
 
-	unsigned int len = 0;
-	int ret = 0;
+	unsigned int len_v = 0, len_f = 0;
+	int ret_v = 0, ret_f = 0;
 
-	ret = f_io_filetobuf(vertpath, &len, vert_src, BUFSZ_SRC);
-	f_error_log_f2b(ret, vertpath, BUFSZ_SRC, len);
+	ret_v = f_io_filetobuf(vertpath, &len_v, vert_src, BUFSZ_SRC);
+	ret_f = f_io_filetobuf(fragpath, &len_f, frag_src, BUFSZ_SRC);
 
-	unsigned int vert = 0;
-	ret = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len);
-	f_error_log_shader(ret, GL_VERTEX_SHADER, vert_log, len);
+	f_error_log_f2b(ret_v, vertpath, BUFSZ_SRC, len_v);
+	f_error_log_f2b(ret_f, fragpath, BUFSZ_SRC, len_f);
 
-	ret = f_io_filetobuf(fragpath, &len, frag_src, BUFSZ_SRC);
-	f_error_log_f2b(ret, fragpath, BUFSZ_SRC, len);
-
-	unsigned int frag = 0;
-	ret = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len);
-	f_error_log_shader(ret, GL_FRAGMENT_SHADER, frag_log, len);
-
-	unsigned int sp = 0;
-	ret = f_gl_genprogram(&sp, vert, frag, prog_log, BUFSZ_LOG, &len);
-	f_error_log_program(ret, prog_log, len);
-
-	return sp;
+	return f_render_genprogram(vert_src, frag_src);
 }
 
 struct vert {
@@ -110,23 +107,6 @@ uint32_t indices[] = {
 	8, 9, 10
 };
 
-void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_winstate *wst) {
-	*ev = wst->iq[wst->iqstart];
-	wst->iqstart = (wst->iqstart + 1) % wst->iqmaxsz;
-	wst->iqlength --;
-}
-
-int f_event_cmp_key(struct t_glfw_inputevent *ev, int key, int mods, int action) {
-	if(ev->type != IEV_KEYPRESS) return 0;
-	struct t_glfw_inputevent_key *k = &ev->data.key_ev;
-	return (k->key == key) && (k->action == action) && (k->mods == mods);
-}
-
-void f_render_evalevent(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
-	if(f_event_cmp_key(ev, GLFW_KEY_Q, GLFW_MOD_CONTROL, GLFW_PRESS))
-		wst->runstate = 0;
-}
-
 void f_render_main(void* win) {
 	/* TODO: cleanup stuff for OpenGL objects */
 	/* currently only creating one set so its fine */
@@ -142,7 +122,7 @@ void f_render_main(void* win) {
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-	unsigned int sp = f_render_genprogram();
+	unsigned int sp = f_render_genprogram_path("shaders/vertex.glsl", "shaders/fragment.glsl");
 	glUseProgram(sp);
 
 	int scaleloc = glGetUniformLocation(sp, "scale");
@@ -161,8 +141,6 @@ void f_render_main(void* win) {
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, rgb)));
 
 	struct t_glfw_winstate* wst = glfwGetWindowUserPointer(win);
-	wst->iqmaxsz = IQSZ_;
-	wst->iq = wsqueue;
 
 	for(glfwSetTime(0.0); wst->runstate; wst->time = glfwGetTime()) {
 		if(wst->szrefresh) {
@@ -181,20 +159,6 @@ void f_render_main(void* win) {
 		glDrawElements(GL_TRIANGLES, M_LEN(indices), GL_UNSIGNED_INT, (void*)0);
 		glfwSwapBuffers(win);
 		glfwPollEvents();
-
-		for(unsigned int i = 0; i < wst->iqlength; ++i) {
-			struct t_glfw_inputevent ev;
-			f_iqpop(&ev, wst);
-			f_render_evalevent(wst, &ev);
-		}
-
-		if(wst->iqoverflow) {
-			fprintf(stderr, "ERROR: Key press queue indices out of bounds!\n");
-			fprintf(stderr, "Discarding top items from queue...\n");
-			f_error_log_queue(wst);
-			wst->iqlength = wst->iqmaxsz - 0x10;
-			wst->iqoverflow = 0;
-		}
 	}
 }
 

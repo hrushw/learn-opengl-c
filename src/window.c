@@ -3,6 +3,15 @@
 
 #include "window.h"
 
+/* References
+ * ----------
+
+ * GLFW documentation [window guide]
+ * "https://www.glfw.org/docs/latest/window_guide.html"
+
+ */
+
+
 /* Append input events to queue to handle later */
 void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
 	if(wst->iqoverflow || !wst->iq) return;
@@ -13,6 +22,19 @@ void f_iqappend(struct t_glfw_winstate *wst, struct t_glfw_inputevent *ev) {
 
 	wst->iqstart %= wst->iqmaxsz;
 }
+
+void f_iqpop(struct t_glfw_inputevent *ev, struct t_glfw_winstate *wst) {
+	*ev = wst->iq[wst->iqstart];
+	wst->iqstart = (wst->iqstart + 1) % wst->iqmaxsz;
+	wst->iqlength --;
+}
+
+int f_event_cmp_key(struct t_glfw_inputevent *ev, int key, int mods, int action) {
+	if(ev->type != IEV_KEYPRESS) return 0;
+	struct t_glfw_inputevent_key *k = &ev->data.key_ev;
+	return (k->key == key) && (k->action == action) && (k->mods == mods);
+}
+
 
 /* ----------------------- *
  * GLFW Callback functions *
