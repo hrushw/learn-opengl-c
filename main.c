@@ -3,6 +3,8 @@
 #include <epoxy/gl.h>
 
 #include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "window.h"
 
@@ -22,13 +24,13 @@ struct t_glfw_winstate ws = {
 const char* vert_src =
 "#version 460 core\n"
 "\n"
-"layout(location = 0) in vec2 pos;\n"
+"layout(location = 0) in vec3 pos;\n"
 "layout(location = 1) in vec3 clr_in;\n"
 "\n"
 "out vec3 clr;\n"
 "\n"
 "void main() {\n"
-"	gl_Position = vec4(pos, 0.0f, 1.0f);\n"
+"	gl_Position = vec4(pos, 1.0f);\n"
 "	clr = clr_in;\n"
 "}\n"
 ;
@@ -44,10 +46,15 @@ const char* frag_src =
 "}\n"
 ;
 
-float vertices[] = {
-	-0.6f, -0.50f, 1.0f, 0.0f, 0.0f,
-	 0.6f, -0.50f, 0.0f, 1.0f, 0.0f,
-	 0.0f,  0.52f, 0.0f, 0.0f, 1.0f,
+struct vert {
+	int32_t pos[3];
+	uint8_t clr[3];
+};
+
+struct vert vertices[] = {
+	{ { -1, -1, 0 }, { 0xFF, 0x00, 0.0f } },
+	{ {  1, -1, 0 }, { 0x00, 0xFF, 0.0f } },
+	{ {  0,  1, 0 }, { 0x00, 0.0f, 0xFF } },
 };
 
 void f_render_main(void* win) {
@@ -62,10 +69,10 @@ void f_render_main(void* win) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 2, GL_INT, GL_FALSE, sizeof(struct vert), (void*)0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct vert), (void*)(offsetof(struct vert, clr)));
 
 	unsigned int vert = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vert, 1, &vert_src, NULL);
