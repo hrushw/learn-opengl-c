@@ -45,16 +45,20 @@ unsigned int f_render_genprogram(char* vert_src, char* frag_src) {
 	static char* const frag_log = chbuf + BUFSZ_LOG;
 	static char* const prog_log = chbuf + 2*BUFSZ_LOG;
 
-	unsigned int vert = 0, frag = 0, sp = 0;
-	unsigned int len_v = 0, len_f = 0, len_sp = 0;
+	int ret = 0;
+	unsigned int len = 0;
 
-	int ret_v = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len_v);
-	int ret_f = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len_f);
-	int ret_sp = f_gl_genprogram(&sp, vert, frag, prog_log, BUFSZ_LOG, &len_sp);
+	unsigned int vert = 0;
+	ret = f_gl_genshader(&vert, GL_VERTEX_SHADER, vert_src, vert_log, BUFSZ_LOG, &len);
+	f_error_log_shader(ret, GL_VERTEX_SHADER, vert_log, len);
 
-	f_error_log_shader(ret_v, GL_VERTEX_SHADER, vert_log, len_v);
-	f_error_log_shader(ret_f, GL_FRAGMENT_SHADER, frag_log, len_f);
-	f_error_log_program(ret_sp, prog_log, len_sp);
+	unsigned int frag = 0;
+	ret = f_gl_genshader(&frag, GL_FRAGMENT_SHADER, frag_src, frag_log, BUFSZ_LOG, &len);
+	f_error_log_shader(ret, GL_FRAGMENT_SHADER, frag_log, len);
+
+	unsigned int sp = 0;
+	ret = f_gl_genprogram(&sp, vert, frag, prog_log, BUFSZ_LOG, &len);
+	f_error_log_program(ret, prog_log, len);
 
 	return sp;
 }

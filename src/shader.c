@@ -6,6 +6,8 @@ enum e_gl_shader_check f_gl_genshader(
 	unsigned int *sid, int type, const char* srcbuf,
 	char* logbuf, unsigned int logbufsz, unsigned int* log_len
 ) {
+	if(!srcbuf) return ERR_GL_SHADER_FAIL;
+
 	unsigned int s = glCreateShader(type);
 	glShaderSource(s, 1, &srcbuf, NULL);
 	glCompileShader(s);
@@ -21,6 +23,8 @@ enum e_gl_shader_check f_gl_genshader(
 	int gl_il_len;
 	glGetShaderiv(s, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
+
+	if(!logbufsz) return ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
 
 	glGetShaderInfoLog(s, logbufsz, NULL, logbuf);
 	logbuf[logbufsz-1] = 0;
@@ -51,6 +55,8 @@ enum e_gl_shader_check f_gl_genprogram(
 	int gl_il_len;
 	glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &gl_il_len);
 	if(log_len) *log_len = gl_il_len;
+
+	if(!logbufsz) return ERR_GL_SHADER_FAIL_LOG_INCOMPLETE;
 
 	glGetProgramInfoLog(sp, logbufsz, NULL, logbuf);
 	logbuf[logbufsz-1] = 0;
