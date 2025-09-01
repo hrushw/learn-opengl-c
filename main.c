@@ -52,9 +52,9 @@ struct vert {
 };
 
 struct vert vertices[] = {
-	{ { -1, -1, 0 }, { 0xFF, 0x00, 0.0f } },
-	{ {  1, -1, 0 }, { 0x00, 0xFF, 0.0f } },
-	{ {  0,  1, 0 }, { 0x00, 0.0f, 0xFF } },
+	{ { -1, -1, 0 }, { 0xFF, 0x00, 0x00 } },
+	{ {  1, -1, 0 }, { 0x00, 0xFF, 0x00 } },
+	{ {  0,  1, 0 }, { 0x00, 0x00, 0xFF } },
 };
 
 void f_render_main(void* win) {
