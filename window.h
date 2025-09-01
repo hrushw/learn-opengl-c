@@ -52,5 +52,10 @@ struct t_glfw_winstate {
 
 void f_iqpop(struct t_glfw_inputevent *, struct t_glfw_winstate *);
 int f_event_cmp_key(struct t_glfw_inputevent *, int, int, int);
+void* f_glfw_initwin (
+	const char*, int, int,
+	enum e_wintype, struct t_glfw_winstate *
+);
+
 
 #endif
