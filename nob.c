@@ -20,8 +20,8 @@
 	#define M_CC "gcc", "-Wall", "-Wextra", "-Wpedantic", "-Wswitch", "-Wvla"
 #endif
 
-#define M_OBJS "obj/window.o", "obj/render.o", "obj/vector.o", "obj/shader.o", "obj/main.o", "obj/fileio.o", "obj/errorlog.o"
-#define M_HEADERS "include/vector.h", "include/window.h", "include/shader.h", "include/fileio.h", "include/errorlog.h"
+#define M_OBJS "obj/window.o", "obj/main.o", "obj/fileio.o"
+#define M_HEADERS "include/window.h", "include/fileio.h"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
 
@@ -61,7 +61,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-
 	putchar('\n');
 	_TEST(CHAR_BIT == 8);
 	_TEST(sizeof(float) == 4);
@@ -83,28 +82,8 @@ int main(int argc, char* argv[]) {
 		try_run(&cmd);
 	}
 
-	if(CHECK_REBUILD_WITH_NOB("obj/vector.o", "src/vector.c", "include/vector.h")) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/vector.c", "-o", "obj/vector.o");
-		try_run(&cmd);
-	}
-
-	if(CHECK_REBUILD_WITH_NOB("obj/shader.o", "src/shader.c", "include/shader.h")) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/shader.c", "-o", "obj/shader.o");
-		try_run(&cmd);
-	}
-
 	if(CHECK_REBUILD_WITH_NOB("obj/fileio.o", "src/fileio.c", "include/fileio.h")) {
 		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/fileio.c", "-o", "obj/fileio.o");
-		try_run(&cmd);
-	}
-
-	if(CHECK_REBUILD_WITH_NOB("obj/errorlog.o", "src/errorlog.c", "include/errorlog.h", "include/fileio.h", "include/shader.h")) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/errorlog.c", "-o", "obj/errorlog.o");
-		try_run(&cmd);
-	}
-
-	if(CHECK_REBUILD_WITH_NOB("obj/render.o", "src/render.c", M_HEADERS)) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "src/render.c", "-o", "obj/render.o");
 		try_run(&cmd);
 	}
 

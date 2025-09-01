@@ -5,10 +5,8 @@
 
 /* References
  * ----------
-
  * GLFW documentation [window guide]
  * "https://www.glfw.org/docs/latest/window_guide.html"
-
  */
 
 
