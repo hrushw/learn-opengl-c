@@ -1,5 +1,6 @@
 #define NOB_IMPLEMENTATION
 #define NOB_WARN_DEPRECATED
+#define NOB_EXPERIMENTAL_DELETE_OLD
 #include "nob.h"
 
 #include "window.h"
@@ -20,7 +21,7 @@
 	#define M_CC "gcc", "-Wall", "-Wextra", "-Wpedantic", "-Wswitch", "-Wvla"
 #endif
 
-#define M_OBJS "window.o", "main.o"
+#define M_OBJS "obj/window.o", "obj/main.o"
 #define M_HEADERS "window.h"
 #define M_LFLAGS "-lm", "-lglfw", "-lepoxy"
 #define M_OBJCOMP "-c", "-I", "include"
@@ -50,6 +51,10 @@ int main(int argc, char* argv[]) {
 
 	if(argc > 1) {
 		if(!strcmp(argv[1], "clean")) {
+			nob_cmd_append(&cmd, "rm", "-f", M_OBJS);
+			return nob_cmd_run(&cmd) ? 0 : -1;
+		}
+		if(!strcmp(argv[1], "cleanall")) {
 			nob_cmd_append(&cmd, "rm", "-f", "render", M_OBJS);
 			return nob_cmd_run(&cmd) ? 0 : -1;
 		} else if(!strcmp(argv[1], "run")) {
@@ -72,13 +77,13 @@ int main(int argc, char* argv[]) {
 	putchar('\n');
 
 	/* Check for updates and recompile object files */
-	if(CHECK_REBUILD_WITH_NOB("main.o", "main.c", "window.h")) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "main.c", "-o", "main.o");
+	if(CHECK_REBUILD_WITH_NOB("obj/main.o", "main.c", "window.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "main.c", "-o", "obj/main.o");
 		try_run(&cmd);
 	}
 
-	if(CHECK_REBUILD_WITH_NOB("window.o", "window.c", "window.h")) {
-		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "window.c", "-o", "window.o");
+	if(CHECK_REBUILD_WITH_NOB("obj/window.o", "window.c", "window.h")) {
+		nob_cmd_append(&cmd, M_CC, M_OBJCOMP, "window.c", "-o", "obj/window.o");
 		try_run(&cmd);
 	}
 
@@ -91,3 +96,4 @@ int main(int argc, char* argv[]) {
 	nob_cmd_free(cmd);
 	return 0;
 }
+
